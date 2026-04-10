@@ -46,6 +46,10 @@ namespace IcuNotes.Models
         // A patient can have one summary record.
         public PatientSummary? PatientSummary { get; set; }
 
+        // One-to-one navigation property.
+        // A patient can have one neurology record.
+        public Neurology? Neurology { get; set; }
+
         // One-to-many navigation property.
         // A patient can have many dated events in the timeline.
         public List<PatientDateEvent> PatientDateEvents { get; set; } = new();
