@@ -1,0 +1,656 @@
+﻿@page "/patients/{id:int}"
+@using IcuNotes.Models
+@using IcuNotes.Constants
+@using Microsoft.AspNetCore.Components.Forms
+@inject IcuNotes.Services.PatientService PatientService
+@implements IDisposable
+
+<PageTitle>Patient Details</PageTitle>
+
+<h3 class="mb-4">Patient Details</h3>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert @statusCssClass">
+        @statusMessage
+    </div>
+}
+
+@if (isLoading)
+{
+    <p>Loading patient details...</p>
+}
+else if (patient is null)
+{
+    <div class="alert alert-warning">
+        Patient not found.
+    </div>
+
+    <a href="/patients" class="btn btn-secondary">Back to Patients</a>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <div class="mb-4">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+                    <div>
+                        <h4 class="card-title mb-1">@patient.Name</h4>
+
+                        <div class="text-muted">
+                            Patient ID: @patient.Id
+                        </div>
+                    </div>
+
+                    <div class="text-md-end">
+                        <div>
+                            <span class="fw-bold">Bed:</span> @patient.Bed
+                        </div>
+
+                        <div>
+                            <span class="fw-bold">Diagnosis:</span>
+                            @if (!string.IsNullOrWhiteSpace(patient.Diagnosis))
+                            {
+                                @patient.Diagnosis
+                            }
+                            else
+                            {
+                                <span class="text-muted">Not added</span>
+                            }
+                        </div>
+
+                        <div>
+                            <span class="fw-bold">Admission Unit:</span>
+                            @if (!string.IsNullOrWhiteSpace(GetSelectedAdmissionUnitName()))
+                            {
+                                @GetSelectedAdmissionUnitName()
+                            }
+                            else
+                            {
+                                <span class="text-muted">Not added</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="@GetTabButtonClass("overview")"
+                            @onclick='() => SelectTab("overview")'>
+                        Overview
+                        @if (isOverviewDirty)
+                        {
+                            <span class="badge bg-warning text-dark ms-2">Unsaved</span>
+                        }
+                    </button>
+
+                    <button class="@GetTabButtonClass("summary")"
+                            @onclick='() => SelectTab("summary")'>
+                        Summary
+                        @if (isSummaryDirty)
+                        {
+                            <span class="badge bg-warning text-dark ms-2">Unsaved</span>
+                        }
+                    </button>
+
+                    <button class="@GetTabButtonClass("timeline")"
+                            @onclick='() => SelectTab("timeline")'>
+                        Timeline
+                        @if (isTimelineDirty)
+                        {
+                            <span class="badge bg-warning text-dark ms-2">Unsaved</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            @if (activeTab == "overview")
+            {
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Overview</h5>
+
+                        @if (isOverviewDirty)
+                        {
+                            <span class="text-warning fw-semibold">You have unsaved overview changes.</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Overview is saved.</span>
+                        }
+                    </div>
+
+                    <EditForm EditContext="overviewEditContext" OnValidSubmit="SaveOverviewAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Name</label>
+                                <InputText class="form-control"
+                                           @bind-Value="patient.Name" />
+                                <ValidationMessage For="@(() => patient.Name)" />
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Bed</label>
+                                <InputSelect class="form-select"
+                                             @bind-Value="patient.Bed">
+                                    <option value="">-- Select Bed --</option>
+
+                                    @foreach (var bed in BedOptions.All)
+                                    {
+                                        <option value="@bed">@bed</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="@(() => patient.Bed)" />
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Age</label>
+                                <InputNumber class="form-control"
+                                             @bind-Value="patient.Age" />
+                                <ValidationMessage For="@(() => patient.Age)" />
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Weight</label>
+                                <InputNumber class="form-control"
+                                             @bind-Value="patient.Weight" />
+                                <ValidationMessage For="@(() => patient.Weight)" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Diagnosis</label>
+                            <InputText class="form-control"
+                                       @bind-Value="patient.Diagnosis" />
+                            <ValidationMessage For="@(() => patient.Diagnosis)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Admission Unit</label>
+                            <InputSelect class="form-select"
+                                         @bind-Value="patient.AdmissionUnitCatalogId">
+                                <option value="">-- Select Admission Unit --</option>
+
+                                @foreach (var unit in admissionUnits)
+                                {
+                                    <option value="@unit.Id">@unit.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit"
+                                    class="btn btn-primary"
+                                    disabled="@isSaving">
+                                @(isSaving ? "Saving..." : "Save Overview Changes")
+                            </button>
+
+                            <button type="button"
+                                    class="btn btn-secondary"
+                                    @onclick="ReloadPatientAsync"
+                                    disabled="@isSaving">
+                                Reload
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            }
+            else if (activeTab == "summary")
+            {
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Patient Summary</h5>
+
+                        @if (isSummaryDirty)
+                        {
+                            <span class="text-warning fw-semibold">You have unsaved summary changes.</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Summary is saved.</span>
+                        }
+                    </div>
+
+                    <EditForm EditContext="summaryEditContext" OnValidSubmit="SaveSummaryAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="mb-3">
+                            <label class="form-label">Combined History</label>
+                            <InputTextArea class="form-control"
+                                           rows="6"
+                                           @bind-Value="patient.PatientSummary!.CombinedHistory" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">To Do</label>
+                            <InputTextArea class="form-control"
+                                           rows="5"
+                                           @bind-Value="patient.PatientSummary!.EventsTodo" />
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit"
+                                    class="btn btn-primary"
+                                    disabled="@isSaving">
+                                @(isSaving ? "Saving..." : "Save Summary Changes")
+                            </button>
+
+                            <button type="button"
+                                    class="btn btn-secondary"
+                                    @onclick="ReloadPatientAsync"
+                                    disabled="@isSaving">
+                                Reload
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            }
+            else if (activeTab == "timeline")
+            {
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Timeline</h5>
+
+                        @if (isTimelineDirty)
+                        {
+                            <span class="text-warning fw-semibold">You have unsaved timeline changes.</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Timeline is saved.</span>
+                        }
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div></div>
+
+                        <button type="button"
+                                class="btn btn-outline-primary"
+                                @onclick="AddTimelineEvent"
+                                disabled="@isSaving">
+                            Add Timeline Event
+                        </button>
+                    </div>
+
+                    @if (orderedDateEvents.Any())
+                    {
+                        <EditForm EditContext="timelineEditContext" OnValidSubmit="SaveTimelineAsync">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+
+                            @foreach (var item in orderedDateEvents)
+                            {
+                                <div class="border rounded p-3 mb-3">
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Event Date</label>
+                                            <InputDate class="form-control"
+                                                       @bind-Value="item.EventDate" />
+                                        </div>
+
+                                        <div class="col-md-8 mb-3">
+                                            <label class="form-label">Title</label>
+                                            <InputText class="form-control"
+                                                       @bind-Value="item.Title" />
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex gap-2">
+                                        <button type="button"
+                                                class="btn btn-outline-danger btn-sm"
+                                                @onclick="() => RemoveTimelineEvent(item)">
+                                            Remove From Page
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="d-flex gap-2">
+                                <button type="submit"
+                                        class="btn btn-primary"
+                                        disabled="@isSaving">
+                                    @(isSaving ? "Saving..." : "Save Timeline Changes")
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-secondary"
+                                        @onclick="ReloadPatientAsync"
+                                        disabled="@isSaving">
+                                    Reload
+                                </button>
+                            </div>
+                        </EditForm>
+                    }
+                    else
+                    {
+                        <div class="alert alert-light border">
+                            No timeline events added yet.
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="button"
+                                    class="btn btn-secondary"
+                                    @onclick="ReloadPatientAsync"
+                                    disabled="@isSaving">
+                                Reload
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+
+            <hr />
+
+            <div class="d-flex gap-2">
+                <a href="/patients" class="btn btn-secondary">Back</a>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Patient? patient;
+    private string? statusMessage;
+    private string statusCssClass = "alert-info";
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string activeTab = "overview";
+
+    private List<PatientDateEvent> orderedDateEvents = new();
+    private List<AdmissionUnitCatalog> admissionUnits = new();
+
+    // These flags are the source for the notification badges.
+    private bool isOverviewDirty;
+    private bool isSummaryDirty;
+    private bool isTimelineDirty;
+
+    // Separate EditContexts let us know which section changed.
+    private EditContext? overviewEditContext;
+    private EditContext? summaryEditContext;
+    private EditContext? timelineEditContext;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadPatientAsync();
+    }
+
+    private async Task LoadPatientAsync()
+    {
+        isLoading = true;
+
+        admissionUnits = await PatientService.GetAdmissionUnitsAsync();
+        patient = await PatientService.GetByIdAsync(Id);
+
+        if (patient is null)
+        {
+            statusMessage = "The requested patient was not found.";
+            statusCssClass = "alert-warning";
+            orderedDateEvents = new List<PatientDateEvent>();
+        }
+        else
+        {
+            patient.PatientSummary ??= new PatientSummary
+            {
+                PatientId = patient.Id
+            };
+
+            patient.PatientDateEvents ??= new List<PatientDateEvent>();
+
+            orderedDateEvents = patient.PatientDateEvents
+                .OrderBy(e => e.EventDate)
+                .ToList();
+
+            CreateEditContexts();
+            ResetDirtyFlags();
+
+            statusMessage = null;
+            statusCssClass = "alert-info";
+        }
+
+        isLoading = false;
+    }
+
+    // Create one EditContext per section and subscribe to change tracking.
+    private void CreateEditContexts()
+    {
+        if (patient is null)
+            return;
+
+        DisposeEditContexts();
+
+        overviewEditContext = new EditContext(patient);
+        overviewEditContext.OnFieldChanged += HandleOverviewFieldChanged;
+
+        summaryEditContext = new EditContext(patient.PatientSummary!);
+        summaryEditContext.OnFieldChanged += HandleSummaryFieldChanged;
+
+        timelineEditContext = new EditContext(new TimelineEditorModel
+        {
+            Events = orderedDateEvents
+        });
+        timelineEditContext.OnFieldChanged += HandleTimelineFieldChanged;
+    }
+
+    private void HandleOverviewFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        isOverviewDirty = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleSummaryFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        isSummaryDirty = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleTimelineFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        isTimelineDirty = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ResetDirtyFlags()
+    {
+        isOverviewDirty = false;
+        isSummaryDirty = false;
+        isTimelineDirty = false;
+    }
+
+    private async Task SaveOverviewAsync()
+    {
+        if (patient is null)
+            return;
+
+        try
+        {
+            isSaving = true;
+
+            await PatientService.UpdateAsync(patient);
+
+            isOverviewDirty = false;
+
+            statusMessage = "Overview changes saved successfully.";
+            statusCssClass = "alert-success";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error while saving overview changes: {ex.Message}";
+            statusCssClass = "alert-danger";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SaveSummaryAsync()
+    {
+        if (patient is null)
+            return;
+
+        try
+        {
+            isSaving = true;
+
+            await PatientService.UpdateAsync(patient);
+
+            isSummaryDirty = false;
+
+            statusMessage = "Summary changes saved successfully.";
+            statusCssClass = "alert-success";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error while saving summary changes: {ex.Message}";
+            statusCssClass = "alert-danger";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SaveTimelineAsync()
+    {
+        if (patient is null)
+            return;
+
+        try
+        {
+            isSaving = true;
+
+            patient.PatientDateEvents = orderedDateEvents
+                .OrderBy(e => e.EventDate)
+                .ToList();
+
+            await PatientService.UpdateAsync(patient);
+
+            // Reload after timeline save so new events get real database Ids.
+            patient = await PatientService.GetByIdAsync(Id);
+
+            if (patient is not null)
+            {
+                patient.PatientSummary ??= new PatientSummary
+                {
+                    PatientId = patient.Id
+                };
+
+                patient.PatientDateEvents ??= new List<PatientDateEvent>();
+
+                orderedDateEvents = patient.PatientDateEvents
+                    .OrderBy(e => e.EventDate)
+                    .ToList();
+
+                CreateEditContexts();
+            }
+
+            isTimelineDirty = false;
+
+            statusMessage = "Timeline changes saved successfully.";
+            statusCssClass = "alert-success";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error while saving timeline changes: {ex.Message}";
+            statusCssClass = "alert-danger";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void AddTimelineEvent()
+    {
+        if (patient is null)
+            return;
+
+        var newEvent = new PatientDateEvent
+        {
+            PatientId = patient.Id,
+            EventDate = DateTime.Today
+        };
+
+        orderedDateEvents.Add(newEvent);
+        orderedDateEvents = orderedDateEvents
+            .OrderBy(e => e.EventDate)
+            .ToList();
+
+        CreateEditContexts();
+        isTimelineDirty = true;
+    }
+
+    private void RemoveTimelineEvent(PatientDateEvent item)
+    {
+        orderedDateEvents.Remove(item);
+        orderedDateEvents = orderedDateEvents
+            .OrderBy(e => e.EventDate)
+            .ToList();
+
+        CreateEditContexts();
+        isTimelineDirty = true;
+    }
+
+    private async Task ReloadPatientAsync()
+    {
+        await LoadPatientAsync();
+
+        statusMessage = "Patient data reloaded.";
+        statusCssClass = "alert-info";
+    }
+
+    private void SelectTab(string tabName)
+    {
+        activeTab = tabName;
+    }
+
+    private string GetTabButtonClass(string tabName)
+    {
+        return activeTab == tabName
+            ? "btn btn-primary"
+            : "btn btn-outline-primary";
+    }
+
+    private string? GetSelectedAdmissionUnitName()
+    {
+        if (patient?.AdmissionUnitCatalogId is null)
+            return null;
+
+        return admissionUnits
+            .FirstOrDefault(x => x.Id == patient.AdmissionUnitCatalogId.Value)
+            ?.Name;
+    }
+
+    private void DisposeEditContexts()
+    {
+        if (overviewEditContext is not null)
+            overviewEditContext.OnFieldChanged -= HandleOverviewFieldChanged;
+
+        if (summaryEditContext is not null)
+            summaryEditContext.OnFieldChanged -= HandleSummaryFieldChanged;
+
+        if (timelineEditContext is not null)
+            timelineEditContext.OnFieldChanged -= HandleTimelineFieldChanged;
+    }
+
+    public void Dispose()
+    {
+        DisposeEditContexts();
+    }
+
+    private class TimelineEditorModel
+    {
+        public List<PatientDateEvent> Events { get; set; } = new();
+    }
+}
