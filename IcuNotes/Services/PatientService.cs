@@ -43,6 +43,9 @@ namespace IcuNotes.Services
                 .Include(p => p.AdmissionUnitCatalog)
                 .Include(p => p.PatientSummary)
                 .Include(p => p.PatientDateEvents)
+                .Include(p => p.Neurology)
+                    .ThenInclude(n => n.Medications)
+                        .ThenInclude(nm => nm.Medication)
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
 
@@ -57,7 +60,7 @@ namespace IcuNotes.Services
 
         // Update an existing active patient.
         // This version updates the patient itself plus the related
-        // PatientSummary and PatientDateEvents in a controlled way.
+        // PatientSummary, Neurology, and PatientDateEvents.
         public async Task UpdateAsync(Patient patient)
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
@@ -67,6 +70,8 @@ namespace IcuNotes.Services
             var existingPatient = await context.Patients
                 .Include(p => p.PatientSummary)
                 .Include(p => p.PatientDateEvents)
+                .Include(p => p.Neurology)
+                    .ThenInclude(n => n.Medications)
                 .FirstOrDefaultAsync(p => p.Id == patient.Id);
 
             if (existingPatient is null)
@@ -103,7 +108,113 @@ namespace IcuNotes.Services
                 existingPatient.PatientSummary.EventsTodo = patient.PatientSummary.EventsTodo;
             }
 
-            // 3) Update PatientDateEvents
+            // 3) Update or create Neurology
+            if (patient.Neurology is null)
+            {
+                // If the incoming object has no neurology section,
+                // leave the current database neurology unchanged.
+            }
+            else if (existingPatient.Neurology is null)
+            {
+                // Create a new neurology row if the database does not have one yet.
+                existingPatient.Neurology = new Neurology
+                {
+                    PatientId = existingPatient.Id,
+                    GcsEye = patient.Neurology.GcsEye,
+                    GcsVerbal = patient.Neurology.GcsVerbal,
+                    GcsMotor = patient.Neurology.GcsMotor,
+                    Pupils = patient.Neurology.Pupils,
+                    MotorStatus = patient.Neurology.MotorStatus
+                };
+
+                // Add the incoming neurology medications to the new neurology row.
+                foreach (var incomingMedication in patient.Neurology.Medications ?? new List<NeurologyMedication>())
+                {
+                    // Ignore incomplete rows where no catalog medication was selected yet.
+                    if (incomingMedication.MedicationId <= 0)
+                        continue;
+
+                    existingPatient.Neurology.Medications.Add(new NeurologyMedication
+                    {
+                        MedicationId = incomingMedication.MedicationId,
+                        Category = incomingMedication.Category,
+                        Dose = incomingMedication.Dose
+                    });
+                }
+            }
+            else
+            {
+                // Update the existing neurology scalar fields.
+                existingPatient.Neurology.GcsEye = patient.Neurology.GcsEye;
+                existingPatient.Neurology.GcsVerbal = patient.Neurology.GcsVerbal;
+                existingPatient.Neurology.GcsMotor = patient.Neurology.GcsMotor;
+                existingPatient.Neurology.Pupils = patient.Neurology.Pupils;
+                existingPatient.Neurology.MotorStatus = patient.Neurology.MotorStatus;
+
+                // Update NeurologyMedication rows
+                var incomingMedications = patient.Neurology.Medications ?? new List<NeurologyMedication>();
+
+                // Collect the real database Ids coming from the page.
+                var incomingExistingMedicationIds = incomingMedications
+                    .Where(m => m.Id > 0)
+                    .Select(m => m.Id)
+                    .ToHashSet();
+
+                // Remove database rows that no longer exist in the incoming list.
+                var medicationsToRemove = existingPatient.Neurology.Medications
+                    .Where(dbMedication => !incomingExistingMedicationIds.Contains(dbMedication.Id))
+                    .ToList();
+
+                foreach (var dbMedication in medicationsToRemove)
+                {
+                    context.Remove(dbMedication);
+                }
+
+                // Add new rows and update existing rows.
+                foreach (var incomingMedication in incomingMedications)
+                {
+                    // Ignore incomplete rows where no catalog medication was selected yet.
+                    if (incomingMedication.MedicationId <= 0)
+                        continue;
+
+                    if (incomingMedication.Id == 0)
+                    {
+                        // This is a new neurology medication row created on the page.
+                        existingPatient.Neurology.Medications.Add(new NeurologyMedication
+                        {
+                            MedicationId = incomingMedication.MedicationId,
+                            Category = incomingMedication.Category,
+                            Dose = incomingMedication.Dose
+                        });
+                    }
+                    else
+                    {
+                        // This is an existing neurology medication row.
+                        var existingMedication = existingPatient.Neurology.Medications
+                            .FirstOrDefault(m => m.Id == incomingMedication.Id);
+
+                        if (existingMedication is null)
+                        {
+                            // Safety fallback:
+                            // if for some reason it was not loaded, add it as a new row.
+                            existingPatient.Neurology.Medications.Add(new NeurologyMedication
+                            {
+                                MedicationId = incomingMedication.MedicationId,
+                                Category = incomingMedication.Category,
+                                Dose = incomingMedication.Dose
+                            });
+                        }
+                        else
+                        {
+                            existingMedication.MedicationId = incomingMedication.MedicationId;
+                            existingMedication.Category = incomingMedication.Category;
+                            existingMedication.Dose = incomingMedication.Dose;
+                        }
+                    }
+                }
+            }
+
+            // 4) Update PatientDateEvents
             // We compare the incoming events from the page with the events
             // already stored in the database.
             var incomingEvents = patient.PatientDateEvents ?? new List<PatientDateEvent>();
@@ -176,6 +287,113 @@ namespace IcuNotes.Services
                 .ToListAsync();
         }
 
+        // Return all reusable medications for dropdown lists
+        public async Task<List<Medication>> GetMedicationsAsync()
+        {
+            await using var context = await _dbFactory.CreateDbContextAsync();
+
+            return await context.Medications
+                .AsNoTracking()
+                .OrderBy(m => m.Name)
+                .ToListAsync();
+        }
+
+        // Add a reusable medication to the shared catalog only if it does not exist already.
+        // This lets the UI create a new drug once, then reuse it later for other patients.
+        public async Task<Medication> AddMedicationIfMissingAsync(Medication medication)
+        {
+            await using var context = await _dbFactory.CreateDbContextAsync();
+
+            var cleanedName = (medication.Name ?? string.Empty).Trim();
+            var cleanedFrequency = string.IsNullOrWhiteSpace(medication.Frequency)
+                ? null
+                : medication.Frequency.Trim();
+
+            if (string.IsNullOrWhiteSpace(cleanedName))
+            {
+                throw new ArgumentException("Medication name is required.", nameof(medication));
+            }
+
+            // Look for an existing medication with the same name.
+            // We compare by normalized lowercase text to reduce duplicates.
+            var normalizedName = cleanedName.ToLower();
+
+            var existingMedication = await context.Medications
+                .FirstOrDefaultAsync(m => m.Name.ToLower() == normalizedName);
+
+            if (existingMedication is not null)
+            {
+                // Optional small upgrade:
+                // if the medication already exists but its Frequency is still empty,
+                // fill it from the new value.
+                if (string.IsNullOrWhiteSpace(existingMedication.Frequency) &&
+                    !string.IsNullOrWhiteSpace(cleanedFrequency))
+                {
+                    existingMedication.Frequency = cleanedFrequency;
+                    await context.SaveChangesAsync();
+                }
+
+                return existingMedication;
+            }
+
+            var newMedication = new Medication
+            {
+                Name = cleanedName,
+                Frequency = cleanedFrequency
+            };
+
+            context.Medications.Add(newMedication);
+            await context.SaveChangesAsync();
+
+            return newMedication;
+        }
+
+        // Update an existing reusable medication in the shared catalog.
+        // This is used when the user wants to fix spelling mistakes
+        // or change the default frequency text.
+        public async Task UpdateMedicationAsync(Medication medication)
+        {
+            await using var context = await _dbFactory.CreateDbContextAsync();
+
+            var cleanedName = (medication.Name ?? string.Empty).Trim();
+            var cleanedFrequency = string.IsNullOrWhiteSpace(medication.Frequency)
+                ? null
+                : medication.Frequency.Trim();
+
+            if (medication.Id <= 0)
+            {
+                throw new ArgumentException("Medication Id is invalid.", nameof(medication));
+            }
+
+            if (string.IsNullOrWhiteSpace(cleanedName))
+            {
+                throw new ArgumentException("Medication name is required.", nameof(medication));
+            }
+
+            var existingMedication = await context.Medications
+                .FirstOrDefaultAsync(m => m.Id == medication.Id);
+
+            if (existingMedication is null)
+            {
+                throw new InvalidOperationException("Medication was not found.");
+            }
+
+            var normalizedName = cleanedName.ToLower();
+
+            var duplicateMedication = await context.Medications
+                .FirstOrDefaultAsync(m => m.Id != medication.Id && m.Name.ToLower() == normalizedName);
+
+            if (duplicateMedication is not null)
+            {
+                throw new InvalidOperationException("Another medication with the same name already exists.");
+            }
+
+            existingMedication.Name = cleanedName;
+            existingMedication.Frequency = cleanedFrequency;
+
+            await context.SaveChangesAsync();
+        }
+
         // Add starter admission units only if the table is still empty.
         // This is a simple seed method for now.
         public async Task SeedAdmissionUnitsIfEmptyAsync()
@@ -204,6 +422,7 @@ namespace IcuNotes.Services
         // This version also copies:
         // - CombinedHistory from PatientSummary
         // - all PatientDateEvents into ArchivedPatientDateEvents
+        // Neurology is intentionally not copied yet.
         public async Task ArchiveAsync(int id)
         {
             await using var context = await _dbFactory.CreateDbContextAsync();

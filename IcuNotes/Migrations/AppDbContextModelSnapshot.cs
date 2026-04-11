@@ -85,6 +85,90 @@ namespace IcuNotes.Migrations
                     b.ToTable("ArchivedPatientDateEvents");
                 });
 
+            modelBuilder.Entity("IcuNotes.Models.Medication", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Frequency")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Medications");
+                });
+
+            modelBuilder.Entity("IcuNotes.Models.Neurology", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("GcsEye")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("GcsMotor")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("GcsVerbal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("MotorStatus")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Pupils")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatientId")
+                        .IsUnique();
+
+                    b.ToTable("Neurologies");
+                });
+
+            modelBuilder.Entity("IcuNotes.Models.NeurologyMedication", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("Dose")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("MedicationId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("NeurologyId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MedicationId");
+
+                    b.HasIndex("NeurologyId");
+
+                    b.ToTable("NeurologyMedications");
+                });
+
             modelBuilder.Entity("IcuNotes.Models.Patient", b =>
                 {
                     b.Property<int>("Id")
@@ -179,6 +263,36 @@ namespace IcuNotes.Migrations
                     b.Navigation("ArchivedPatient");
                 });
 
+            modelBuilder.Entity("IcuNotes.Models.Neurology", b =>
+                {
+                    b.HasOne("IcuNotes.Models.Patient", "Patient")
+                        .WithOne("Neurology")
+                        .HasForeignKey("IcuNotes.Models.Neurology", "PatientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("IcuNotes.Models.NeurologyMedication", b =>
+                {
+                    b.HasOne("IcuNotes.Models.Medication", "Medication")
+                        .WithMany()
+                        .HasForeignKey("MedicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IcuNotes.Models.Neurology", "Neurology")
+                        .WithMany("Medications")
+                        .HasForeignKey("NeurologyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Medication");
+
+                    b.Navigation("Neurology");
+                });
+
             modelBuilder.Entity("IcuNotes.Models.Patient", b =>
                 {
                     b.HasOne("IcuNotes.Models.AdmissionUnitCatalog", "AdmissionUnitCatalog")
@@ -216,8 +330,15 @@ namespace IcuNotes.Migrations
                     b.Navigation("ArchivedPatientDateEvents");
                 });
 
+            modelBuilder.Entity("IcuNotes.Models.Neurology", b =>
+                {
+                    b.Navigation("Medications");
+                });
+
             modelBuilder.Entity("IcuNotes.Models.Patient", b =>
                 {
+                    b.Navigation("Neurology");
+
                     b.Navigation("PatientDateEvents");
 
                     b.Navigation("PatientSummary");

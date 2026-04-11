@@ -103,7 +103,7 @@ namespace IcuNotes.Models
         public string? MotorStatus { get; set; }
 
         // All saved medication rows for the Neurology section.
-        // We save them in one collection, then split them in the UI by Category.
+        // This is the real stored collection in the database.
         public List<NeurologyMedication> Medications { get; set; } = new();
 
         // Convenience property for total GCS.
@@ -125,22 +125,17 @@ namespace IcuNotes.Models
             }
         }
 
-        // Helper list for sedation medications.
-        // This is only for easier use in the UI later.
-        // It is not stored in the database as a separate column/table.
+        // Filtered helper view for sedation medications.
+        // This is not a separate saved list in the database.
         [NotMapped]
-        public List<NeurologyMedication> SedationMedications =>
-            Medications
-                .Where(m => m.Category == NeurologyMedicationCategory.Sedation)
-                .ToList();
+        public IEnumerable<NeurologyMedication> SedationMedications =>
+            Medications.Where(m => m.Category == NeurologyMedicationCategory.Sedation);
 
-        // Helper list for neuro medications.
-        // This is only for easier use in the UI later.
+        // Filtered helper view for neuro medications.
+        // This is not a separate saved list in the database.
         [NotMapped]
-        public List<NeurologyMedication> NeuroMedications =>
-            Medications
-                .Where(m => m.Category == NeurologyMedicationCategory.Neuro)
-                .ToList();
+        public IEnumerable<NeurologyMedication> NeuroMedications =>
+            Medications.Where(m => m.Category == NeurologyMedicationCategory.Neuro);
     }
 
     public class NeurologyMedication
@@ -164,10 +159,16 @@ namespace IcuNotes.Models
         // Sedation medications or Neuro medications in the UI.
         public NeurologyMedicationCategory Category { get; set; }
 
-        // Patient-specific dose, route and frequency.
-        // Example: "100 mg/h iv infusion"
-        [MaxLength(100)]
-        public string? Dose { get; set; }
-        
+        // Patient-specific dose text.
+        // Examples:
+        // - "100" when the shared medication frequency is "mcg/kg/min"
+        // - "500 mg" when the shared medication frequency is "BD"
+        public decimal? Dose { get; set; }
+
+        // Helper property for the default/shared frequency coming
+        // from the reusable Medication catalog.
+        // This is not stored in the database.
+        [NotMapped]
+        public string? DefaultFrequency => Medication?.Frequency;
     }
 }

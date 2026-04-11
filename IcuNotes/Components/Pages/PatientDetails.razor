@@ -1,4 +1,5 @@
 ﻿@page "/patients/{id:int}"
+@using System.ComponentModel.DataAnnotations
 @using IcuNotes.Models
 @using IcuNotes.Constants
 @using Microsoft.AspNetCore.Components.Forms
@@ -99,6 +100,15 @@ else
                             @onclick='() => SelectTab("timeline")'>
                         Timeline
                         @if (isTimelineDirty)
+                        {
+                            <span class="badge bg-warning text-dark ms-2">Unsaved</span>
+                        }
+                    </button>
+
+                    <button class="@GetTabButtonClass("neurology")"
+                            @onclick='() => SelectTab("neurology")'>
+                        Neurology
+                        @if (isNeurologyDirty)
                         {
                             <span class="badge bg-warning text-dark ms-2">Unsaved</span>
                         }
@@ -346,11 +356,405 @@ else
                     }
                 </div>
             }
+            else if (activeTab == "neurology")
+            {
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Neurology</h5>
+
+                        @if (isNeurologyDirty)
+                        {
+                            <span class="text-warning fw-semibold">You have unsaved neurology changes.</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Neurology is saved.</span>
+                        }
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mb-3">
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                @onclick="OpenAddMedicationModal"
+                                disabled="@isSaving">
+                            Add New Medication To Catalog
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                @onclick="OpenEditMedicationModal"
+                                disabled="@isSaving">
+                            Edit Medication In Catalog
+                        </button>
+                    </div>
+
+                    <EditForm EditContext="neurologyEditContext" OnValidSubmit="SaveNeurologyAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="border rounded p-3 mb-4">
+                            <h6 class="mb-3">Glasgow Coma Scale</h6>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Eye</label>
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="patient.Neurology!.GcsEye">
+                                        <option value="">-- Select Eye Response --</option>
+
+                                        @foreach (var eye in Enum.GetValues<GcsEyeResponse>())
+                                        {
+                                            <option value="@eye">@GetEnumDisplayName(eye)</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Verbal</label>
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="patient.Neurology!.GcsVerbal">
+                                        <option value="">-- Select Verbal Response --</option>
+
+                                        @foreach (var verbal in Enum.GetValues<GcsVerbalResponse>())
+                                        {
+                                            <option value="@verbal">@GetEnumDisplayName(verbal)</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Motor</label>
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="patient.Neurology!.GcsMotor">
+                                        <option value="">-- Select Motor Response --</option>
+
+                                        @foreach (var motor in Enum.GetValues<GcsMotorResponse>())
+                                        {
+                                            <option value="@motor">@GetEnumDisplayName(motor)</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-light border mb-0">
+                                <span class="fw-semibold">GCS Total:</span>
+                                @if (patient.Neurology.GcsTotal.HasValue)
+                                {
+                                    <span>@patient.Neurology.GcsTotal.Value</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Complete all 3 GCS fields to calculate total.</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Pupils</label>
+                                <InputText class="form-control"
+                                           @bind-Value="patient.Neurology!.Pupils" />
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Motor Status</label>
+                                <InputText class="form-control"
+                                           @bind-Value="patient.Neurology!.MotorStatus" />
+                            </div>
+                        </div>
+
+                        <div class="border rounded p-3 mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">Sedation Medications</h6>
+
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm"
+                                        @onclick="() => AddNeurologyMedication(NeurologyMedicationCategory.Sedation)"
+                                        disabled="@isSaving">
+                                    Add Sedation Medication
+                                </button>
+                            </div>
+
+                            @if (GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Sedation).Any())
+                            {
+                                @foreach (var item in GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Sedation))
+                                {
+                                    <div class="border rounded p-3 mb-3">
+                                        <div class="row">
+                                            <div class="col-md-7 mb-3">
+                                                <label class="form-label">Medication</label>
+                                                <InputSelect class="form-select"
+                                                             @bind-Value="item.MedicationId">
+                                                    <option value="0">-- Select Medication --</option>
+
+                                                    @foreach (var medication in medications)
+                                                    {
+                                                        <option value="@medication.Id">@medication.Name</option>
+                                                    }
+                                                </InputSelect>
+
+                                                @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                                {
+                                                    <div class="form-text">
+                                                        Default frequency: @GetMedicationFrequency(item.MedicationId)
+                                                    </div>
+                                                }
+                                            </div>
+
+                                            <div class="col-md-5 mb-3">
+                                                <label class="form-label">Dose</label>
+                                                <InputNumber TValue="decimal?"
+                                                             class="form-control"
+                                                             @bind-Value="item.Dose" />
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex gap-2">
+                                            <button type="button"
+                                                    class="btn btn-outline-danger btn-sm"
+                                                    @onclick="() => RemoveNeurologyMedication(item)"
+                                                    disabled="@isSaving">
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="alert alert-light border mb-0">
+                                    No sedation medications added yet.
+                                </div>
+                            }
+                        </div>
+
+                        <div class="border rounded p-3 mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">Neuro Medications</h6>
+
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm"
+                                        @onclick="() => AddNeurologyMedication(NeurologyMedicationCategory.Neuro)"
+                                        disabled="@isSaving">
+                                    Add Neuro Medication
+                                </button>
+                            </div>
+
+                            @if (GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Neuro).Any())
+                            {
+                                @foreach (var item in GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Neuro))
+                                {
+                                    <div class="border rounded p-3 mb-3">
+                                        <div class="row">
+                                            <div class="col-md-7 mb-3">
+                                                <label class="form-label">Medication</label>
+                                                <InputSelect class="form-select"
+                                                             @bind-Value="item.MedicationId">
+                                                    <option value="0">-- Select Medication --</option>
+
+                                                    @foreach (var medication in medications)
+                                                    {
+                                                        <option value="@medication.Id">@medication.Name</option>
+                                                    }
+                                                </InputSelect>
+
+                                                @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                                {
+                                                    <div class="form-text">
+                                                        Default frequency: @GetMedicationFrequency(item.MedicationId)
+                                                    </div>
+                                                }
+                                            </div>
+
+                                            <div class="col-md-5 mb-3">
+                                                <label class="form-label">Dose</label>
+                                                <InputNumber TValue="decimal?"
+                                                             class="form-control"
+                                                             @bind-Value="item.Dose" />
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex gap-2">
+                                            <button type="button"
+                                                    class="btn btn-outline-danger btn-sm"
+                                                    @onclick="() => RemoveNeurologyMedication(item)"
+                                                    disabled="@isSaving">
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="alert alert-light border mb-0">
+                                    No neuro medications added yet.
+                                </div>
+                            }
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit"
+                                    class="btn btn-primary"
+                                    disabled="@isSaving">
+                                @(isSaving ? "Saving..." : "Save Neurology Changes")
+                            </button>
+
+                            <button type="button"
+                                    class="btn btn-secondary"
+                                    @onclick="ReloadPatientAsync"
+                                    disabled="@isSaving">
+                                Reload
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            }
 
             <hr />
 
             <div class="d-flex gap-2">
                 <a href="/patients" class="btn btn-secondary">Back</a>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showAddMedicationModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Medication</h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseAddMedicationModal"
+                            disabled="@isSaving">
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(newMedicationErrorMessage))
+                    {
+                        <div class="alert alert-warning">
+                            @newMedicationErrorMessage
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Medication Name</label>
+                        <InputText class="form-control"
+                                   @bind-Value="newMedicationName" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Default Frequency</label>
+                        <InputText class="form-control"
+                                   @bind-Value="newMedicationFrequency" />
+                        <div class="form-text">
+                            Examples: mcg/kg/min, BD, TID, q8h
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseAddMedicationModal"
+                            disabled="@isSaving">
+                        Cancel
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="SaveNewMedicationAsync"
+                            disabled="@isSaving">
+                        @(isSaving ? "Saving..." : "Save Medication")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+@if (showEditMedicationModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Medication</h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseEditMedicationModal"
+                            disabled="@isSaving">
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(editMedicationErrorMessage))
+                    {
+                        <div class="alert alert-warning">
+                            @editMedicationErrorMessage
+                        </div>
+                    }
+
+                    @if (!medications.Any())
+                    {
+                        <div class="alert alert-light border mb-0">
+                            No medications in the catalog yet.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Select Medication</label>
+                            <select class="form-select"
+                                    value="@selectedMedicationToEditId"
+                                    @onchange="OnSelectedMedicationToEditChanged">
+                                @foreach (var medication in medications)
+                                {
+                                    <option value="@medication.Id">@medication.Name</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Medication Name</label>
+                            <InputText class="form-control"
+                                       @bind-Value="editMedicationName" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Default Frequency</label>
+                            <InputText class="form-control"
+                                       @bind-Value="editMedicationFrequency" />
+                            <div class="form-text">
+                                Examples: mcg/kg/min, BD, TID, q8h
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseEditMedicationModal"
+                            disabled="@isSaving">
+                        Cancel
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="SaveEditedMedicationAsync"
+                            disabled="@isSaving">
+                        @(isSaving ? "Saving..." : "Save Changes")
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -369,16 +773,33 @@ else
 
     private List<PatientDateEvent> orderedDateEvents = new();
     private List<AdmissionUnitCatalog> admissionUnits = new();
+    private List<Medication> medications = new();
 
     // These flags are the source for the notification badges.
     private bool isOverviewDirty;
     private bool isSummaryDirty;
     private bool isTimelineDirty;
+    private bool isNeurologyDirty;
 
     // Separate EditContexts let us know which section changed.
     private EditContext? overviewEditContext;
     private EditContext? summaryEditContext;
     private EditContext? timelineEditContext;
+    private EditContext? neurologyEditContext;
+
+    // Modal state for adding a reusable medication to the shared catalog.
+    private bool showAddMedicationModal;
+    private string newMedicationName = string.Empty;
+    private string newMedicationFrequency = string.Empty;
+    private string? newMedicationErrorMessage;
+
+    // Modal state for editing an existing reusable medication
+    // from the shared catalog.
+    private bool showEditMedicationModal;
+    private int selectedMedicationToEditId;
+    private string editMedicationName = string.Empty;
+    private string editMedicationFrequency = string.Empty;
+    private string? editMedicationErrorMessage;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -390,6 +811,7 @@ else
         isLoading = true;
 
         admissionUnits = await PatientService.GetAdmissionUnitsAsync();
+        medications = await PatientService.GetMedicationsAsync();
         patient = await PatientService.GetByIdAsync(Id);
 
         if (patient is null)
@@ -400,16 +822,7 @@ else
         }
         else
         {
-            patient.PatientSummary ??= new PatientSummary
-            {
-                PatientId = patient.Id
-            };
-
-            patient.PatientDateEvents ??= new List<PatientDateEvent>();
-
-            orderedDateEvents = patient.PatientDateEvents
-                .OrderBy(e => e.EventDate)
-                .ToList();
+            EnsurePatientChildObjects();
 
             CreateEditContexts();
             ResetDirtyFlags();
@@ -419,6 +832,31 @@ else
         }
 
         isLoading = false;
+    }
+
+    // Make sure all child objects exist before the page tries to bind to them.
+    private void EnsurePatientChildObjects()
+    {
+        if (patient is null)
+            return;
+
+        patient.PatientSummary ??= new PatientSummary
+        {
+            PatientId = patient.Id
+        };
+
+        patient.PatientDateEvents ??= new List<PatientDateEvent>();
+
+        patient.Neurology ??= new Neurology
+        {
+            PatientId = patient.Id
+        };
+
+        patient.Neurology.Medications ??= new List<NeurologyMedication>();
+
+        orderedDateEvents = patient.PatientDateEvents
+            .OrderBy(e => e.EventDate)
+            .ToList();
     }
 
     // Create one EditContext per section and subscribe to change tracking.
@@ -440,6 +878,9 @@ else
             Events = orderedDateEvents
         });
         timelineEditContext.OnFieldChanged += HandleTimelineFieldChanged;
+
+        neurologyEditContext = new EditContext(patient.Neurology!);
+        neurologyEditContext.OnFieldChanged += HandleNeurologyFieldChanged;
     }
 
     private void HandleOverviewFieldChanged(object? sender, FieldChangedEventArgs e)
@@ -460,11 +901,18 @@ else
         InvokeAsync(StateHasChanged);
     }
 
+    private void HandleNeurologyFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        isNeurologyDirty = true;
+        InvokeAsync(StateHasChanged);
+    }
+
     private void ResetDirtyFlags()
     {
         isOverviewDirty = false;
         isSummaryDirty = false;
         isTimelineDirty = false;
+        isNeurologyDirty = false;
     }
 
     private async Task SaveOverviewAsync()
@@ -541,17 +989,7 @@ else
 
             if (patient is not null)
             {
-                patient.PatientSummary ??= new PatientSummary
-                {
-                    PatientId = patient.Id
-                };
-
-                patient.PatientDateEvents ??= new List<PatientDateEvent>();
-
-                orderedDateEvents = patient.PatientDateEvents
-                    .OrderBy(e => e.EventDate)
-                    .ToList();
-
+                EnsurePatientChildObjects();
                 CreateEditContexts();
             }
 
@@ -563,6 +1001,52 @@ else
         catch (Exception ex)
         {
             statusMessage = $"Error while saving timeline changes: {ex.Message}";
+            statusCssClass = "alert-danger";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SaveNeurologyAsync()
+    {
+        if (patient is null)
+            return;
+
+        try
+        {
+            isSaving = true;
+
+            // Make sure the neurology section exists and is linked to this patient.
+            patient.Neurology ??= new Neurology
+            {
+                PatientId = patient.Id
+            };
+
+            patient.Neurology.PatientId = patient.Id;
+            patient.Neurology.Medications ??= new List<NeurologyMedication>();
+
+            await PatientService.UpdateAsync(patient);
+
+            // Reload after save so new medication rows get real database Ids
+            // and so Medication navigation properties are refreshed.
+            patient = await PatientService.GetByIdAsync(Id);
+
+            if (patient is not null)
+            {
+                EnsurePatientChildObjects();
+                CreateEditContexts();
+            }
+
+            isNeurologyDirty = false;
+
+            statusMessage = "Neurology changes saved successfully.";
+            statusCssClass = "alert-success";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error while saving neurology changes: {ex.Message}";
             statusCssClass = "alert-danger";
         }
         finally
@@ -602,6 +1086,41 @@ else
         isTimelineDirty = true;
     }
 
+    private void AddNeurologyMedication(NeurologyMedicationCategory category)
+    {
+        if (patient?.Neurology is null)
+            return;
+
+        patient.Neurology.Medications.Add(new NeurologyMedication
+        {
+            Category = category
+        });
+
+        CreateEditContexts();
+        isNeurologyDirty = true;
+    }
+
+    private void RemoveNeurologyMedication(NeurologyMedication item)
+    {
+        if (patient?.Neurology is null)
+            return;
+
+        patient.Neurology.Medications.Remove(item);
+
+        CreateEditContexts();
+        isNeurologyDirty = true;
+    }
+
+    private IEnumerable<NeurologyMedication> GetNeurologyMedicationsByCategory(NeurologyMedicationCategory category)
+    {
+        if (patient?.Neurology?.Medications is null)
+            return Enumerable.Empty<NeurologyMedication>();
+
+        return patient.Neurology.Medications
+            .Where(x => x.Category == category)
+            .ToList();
+    }
+
     private async Task ReloadPatientAsync()
     {
         await LoadPatientAsync();
@@ -632,6 +1151,194 @@ else
             ?.Name;
     }
 
+    private string? GetMedicationFrequency(int medicationId)
+    {
+        if (medicationId <= 0)
+            return null;
+
+        return medications
+            .FirstOrDefault(x => x.Id == medicationId)
+            ?.Frequency;
+    }
+
+    private void OpenAddMedicationModal()
+    {
+        showEditMedicationModal = false;
+        newMedicationName = string.Empty;
+        newMedicationFrequency = string.Empty;
+        newMedicationErrorMessage = null;
+        showAddMedicationModal = true;
+    }
+
+    private void CloseAddMedicationModal()
+    {
+        showAddMedicationModal = false;
+        newMedicationErrorMessage = null;
+    }
+
+    private void OpenEditMedicationModal()
+    {
+        showAddMedicationModal = false;
+        editMedicationErrorMessage = null;
+        showEditMedicationModal = true;
+
+        if (medications.Any())
+        {
+            // Preload the first medication so the modal opens in a usable state.
+            LoadMedicationForEdit(medications.First().Id);
+        }
+        else
+        {
+            selectedMedicationToEditId = 0;
+            editMedicationName = string.Empty;
+            editMedicationFrequency = string.Empty;
+        }
+    }
+
+    private void CloseEditMedicationModal()
+    {
+        showEditMedicationModal = false;
+        selectedMedicationToEditId = 0;
+        editMedicationName = string.Empty;
+        editMedicationFrequency = string.Empty;
+        editMedicationErrorMessage = null;
+    }
+
+    private void OnSelectedMedicationToEditChanged(ChangeEventArgs e)
+    {
+        if (e.Value is null)
+            return;
+
+        if (int.TryParse(e.Value.ToString(), out var medicationId))
+        {
+            LoadMedicationForEdit(medicationId);
+        }
+    }
+
+    private void LoadMedicationForEdit(int medicationId)
+    {
+        selectedMedicationToEditId = medicationId;
+
+        var selectedMedication = medications
+            .FirstOrDefault(x => x.Id == medicationId);
+
+        if (selectedMedication is null)
+        {
+            editMedicationName = string.Empty;
+            editMedicationFrequency = string.Empty;
+            return;
+        }
+
+        editMedicationName = selectedMedication.Name;
+        editMedicationFrequency = selectedMedication.Frequency ?? string.Empty;
+    }
+
+    private async Task SaveNewMedicationAsync()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(newMedicationName))
+            {
+                newMedicationErrorMessage = "Medication name is required.";
+                return;
+            }
+
+            isSaving = true;
+
+            await PatientService.AddMedicationIfMissingAsync(new Medication
+            {
+                Name = newMedicationName.Trim(),
+                Frequency = string.IsNullOrWhiteSpace(newMedicationFrequency)
+                    ? null
+                    : newMedicationFrequency.Trim()
+            });
+
+            medications = await PatientService.GetMedicationsAsync();
+
+            showAddMedicationModal = false;
+            newMedicationName = string.Empty;
+            newMedicationFrequency = string.Empty;
+            newMedicationErrorMessage = null;
+
+            statusMessage = "Medication catalog updated successfully.";
+            statusCssClass = "alert-success";
+        }
+        catch (Exception ex)
+        {
+            newMedicationErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SaveEditedMedicationAsync()
+    {
+        try
+        {
+            editMedicationErrorMessage = null;
+
+            if (selectedMedicationToEditId <= 0)
+            {
+                editMedicationErrorMessage = "Please select a medication first.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(editMedicationName))
+            {
+                editMedicationErrorMessage = "Medication name is required.";
+                return;
+            }
+
+            isSaving = true;
+
+            await PatientService.UpdateMedicationAsync(new Medication
+            {
+                Id = selectedMedicationToEditId,
+                Name = editMedicationName.Trim(),
+                Frequency = string.IsNullOrWhiteSpace(editMedicationFrequency)
+                    ? null
+                    : editMedicationFrequency.Trim()
+            });
+
+            medications = await PatientService.GetMedicationsAsync();
+
+            // Reload the current selection from the refreshed medication list.
+            LoadMedicationForEdit(selectedMedicationToEditId);
+
+            showEditMedicationModal = false;
+            editMedicationErrorMessage = null;
+
+            statusMessage = "Medication catalog entry updated successfully.";
+            statusCssClass = "alert-success";
+        }
+        catch (Exception ex)
+        {
+            editMedicationErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    // Return a friendly label for enum values using [Display(Name = "...")].
+    private static string GetEnumDisplayName<TEnum>(TEnum value) where TEnum : struct, Enum
+    {
+        var memberInfo = typeof(TEnum).GetMember(value.ToString()).FirstOrDefault();
+
+        if (memberInfo is null)
+            return value.ToString();
+
+        var displayAttribute = memberInfo
+            .GetCustomAttributes(typeof(DisplayAttribute), false)
+            .OfType<DisplayAttribute>()
+            .FirstOrDefault();
+
+        return displayAttribute?.Name ?? value.ToString();
+    }
+
     private void DisposeEditContexts()
     {
         if (overviewEditContext is not null)
@@ -642,6 +1349,9 @@ else
 
         if (timelineEditContext is not null)
             timelineEditContext.OnFieldChanged -= HandleTimelineFieldChanged;
+
+        if (neurologyEditContext is not null)
+            neurologyEditContext.OnFieldChanged -= HandleNeurologyFieldChanged;
     }
 
     public void Dispose()

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace IcuNotes.Migrations
 {
     /// <inheritdoc />
-    public partial class Phase01 : Migration
+    public partial class ReCreatingEverything : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -39,6 +39,20 @@ namespace IcuNotes.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ArchivedPatients", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Medications",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    Frequency = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Medications", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -87,6 +101,30 @@ namespace IcuNotes.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Neurologies",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    PatientId = table.Column<int>(type: "INTEGER", nullable: false),
+                    GcsEye = table.Column<int>(type: "INTEGER", nullable: true),
+                    GcsVerbal = table.Column<int>(type: "INTEGER", nullable: true),
+                    GcsMotor = table.Column<int>(type: "INTEGER", nullable: true),
+                    Pupils = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    MotorStatus = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Neurologies", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Neurologies_Patients_PatientId",
+                        column: x => x.PatientId,
+                        principalTable: "Patients",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PatientDateEvents",
                 columns: table => new
                 {
@@ -128,10 +166,60 @@ namespace IcuNotes.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "NeurologyMedications",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    NeurologyId = table.Column<int>(type: "INTEGER", nullable: false),
+                    MedicationId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Category = table.Column<int>(type: "INTEGER", nullable: false),
+                    Dose = table.Column<decimal>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_NeurologyMedications", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_NeurologyMedications_Medications_MedicationId",
+                        column: x => x.MedicationId,
+                        principalTable: "Medications",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_NeurologyMedications_Neurologies_NeurologyId",
+                        column: x => x.NeurologyId,
+                        principalTable: "Neurologies",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_ArchivedPatientDateEvents_ArchivedPatientId",
                 table: "ArchivedPatientDateEvents",
                 column: "ArchivedPatientId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Medications_Name",
+                table: "Medications",
+                column: "Name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Neurologies_PatientId",
+                table: "Neurologies",
+                column: "PatientId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NeurologyMedications_MedicationId",
+                table: "NeurologyMedications",
+                column: "MedicationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NeurologyMedications_NeurologyId",
+                table: "NeurologyMedications",
+                column: "NeurologyId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PatientDateEvents_PatientId",
@@ -157,6 +245,9 @@ namespace IcuNotes.Migrations
                 name: "ArchivedPatientDateEvents");
 
             migrationBuilder.DropTable(
+                name: "NeurologyMedications");
+
+            migrationBuilder.DropTable(
                 name: "PatientDateEvents");
 
             migrationBuilder.DropTable(
@@ -164,6 +255,12 @@ namespace IcuNotes.Migrations
 
             migrationBuilder.DropTable(
                 name: "ArchivedPatients");
+
+            migrationBuilder.DropTable(
+                name: "Medications");
+
+            migrationBuilder.DropTable(
+                name: "Neurologies");
 
             migrationBuilder.DropTable(
                 name: "Patients");
