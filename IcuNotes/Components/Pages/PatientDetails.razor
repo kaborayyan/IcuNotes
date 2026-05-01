@@ -1,5 +1,4 @@
 ﻿@page "/patients/{id:int}"
-@using System.ComponentModel.DataAnnotations
 @using IcuNotes.Models
 @using IcuNotes.Constants
 @using Microsoft.AspNetCore.Components.Forms
@@ -76,12 +75,14 @@ else
                 </div>
             </div>
 
+            @* Keep the page tabs small. Overview now includes the timeline,
+               so Timeline no longer needs its own separate tab. *@
             <div class="mb-4">
                 <div class="d-flex flex-wrap gap-2">
                     <button class="@GetTabButtonClass("overview")"
                             @onclick='() => SelectTab("overview")'>
                         Overview
-                        @if (isOverviewDirty)
+                        @if (isOverviewDirty || isTimelineDirty)
                         {
                             <span class="badge bg-warning text-dark ms-2">Unsaved</span>
                         }
@@ -91,15 +92,6 @@ else
                             @onclick='() => SelectTab("summary")'>
                         Summary
                         @if (isSummaryDirty)
-                        {
-                            <span class="badge bg-warning text-dark ms-2">Unsaved</span>
-                        }
-                    </button>
-
-                    <button class="@GetTabButtonClass("timeline")"
-                            @onclick='() => SelectTab("timeline")'>
-                        Timeline
-                        @if (isTimelineDirty)
                         {
                             <span class="badge bg-warning text-dark ms-2">Unsaved</span>
                         }
@@ -116,645 +108,57 @@ else
                 </div>
             </div>
 
+            @* Render Overview through its own child component.
+               This is the first step in splitting PatientDetails into smaller files. *@
             @if (activeTab == "overview")
             {
-                <div>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">Overview</h5>
-
-                        @if (isOverviewDirty)
-                        {
-                            <span class="text-warning fw-semibold">You have unsaved overview changes.</span>
-                        }
-                        else
-                        {
-                            <span class="text-muted">Overview is saved.</span>
-                        }
-                    </div>
-
-                    <EditForm EditContext="overviewEditContext" OnValidSubmit="SaveOverviewAsync">
-                        <DataAnnotationsValidator />
-                        <ValidationSummary />
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Name</label>
-                                <InputText class="form-control"
-                                           @bind-Value="patient.Name" />
-                                <ValidationMessage For="@(() => patient.Name)" />
-                            </div>
-
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Bed</label>
-                                <InputSelect class="form-select"
-                                             @bind-Value="patient.Bed">
-                                    <option value="">-- Select Bed --</option>
-
-                                    @foreach (var bed in BedOptions.All)
-                                    {
-                                        <option value="@bed">@bed</option>
-                                    }
-                                </InputSelect>
-                                <ValidationMessage For="@(() => patient.Bed)" />
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Age</label>
-                                <InputNumber class="form-control"
-                                             @bind-Value="patient.Age" />
-                                <ValidationMessage For="@(() => patient.Age)" />
-                            </div>
-
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Weight</label>
-                                <InputNumber class="form-control"
-                                             @bind-Value="patient.Weight" />
-                                <ValidationMessage For="@(() => patient.Weight)" />
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Diagnosis</label>
-                            <InputText class="form-control"
-                                       @bind-Value="patient.Diagnosis" />
-                            <ValidationMessage For="@(() => patient.Diagnosis)" />
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Admission Unit</label>
-                            <InputSelect class="form-select"
-                                         @bind-Value="patient.AdmissionUnitCatalogId">
-                                <option value="">-- Select Admission Unit --</option>
-
-                                @foreach (var unit in admissionUnits)
-                                {
-                                    <option value="@unit.Id">@unit.Name</option>
-                                }
-                            </InputSelect>
-                        </div>
-
-                        <div class="d-flex gap-2">
-                            <button type="submit"
-                                    class="btn btn-primary"
-                                    disabled="@isSaving">
-                                @(isSaving ? "Saving..." : "Save Overview Changes")
-                            </button>
-
-                            <button type="button"
-                                    class="btn btn-secondary"
-                                    @onclick="ReloadPatientAsync"
-                                    disabled="@isSaving">
-                                Reload
-                            </button>
-                        </div>
-                    </EditForm>
-                </div>
+                <OverviewSection Patient="patient"
+                                 AdmissionUnits="admissionUnits"
+                                 OrderedDateEvents="orderedDateEvents"
+                                 OverviewEditContext="overviewEditContext!"
+                                 TimelineEditContext="timelineEditContext!"
+                                 IsOverviewDirty="isOverviewDirty"
+                                 IsTimelineDirty="isTimelineDirty"
+                                 IsSaving="isSaving"
+                                 OnSaveOverview="SaveOverviewAsync"
+                                 OnSaveTimeline="SaveTimelineAsync"
+                                 OnReload="ReloadPatientAsync"
+                                 OnAddTimelineEvent="AddTimelineEventCallbackAsync"
+                                 OnRemoveTimelineEvent="RemoveTimelineEventCallbackAsync" />
             }
+            @* Render Summary through its own child component.
+               The parent page still owns save logic and dirty tracking for now. *@
             else if (activeTab == "summary")
             {
-                <div>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">Patient Summary</h5>
-
-                        @if (isSummaryDirty)
-                        {
-                            <span class="text-warning fw-semibold">You have unsaved summary changes.</span>
-                        }
-                        else
-                        {
-                            <span class="text-muted">Summary is saved.</span>
-                        }
-                    </div>
-
-                    <EditForm EditContext="summaryEditContext" OnValidSubmit="SaveSummaryAsync">
-                        <DataAnnotationsValidator />
-                        <ValidationSummary />
-
-                        <div class="mb-3">
-                            <label class="form-label">Combined History</label>
-                            <InputTextArea class="form-control"
-                                           rows="6"
-                                           @bind-Value="patient.PatientSummary!.CombinedHistory" />
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">To Do</label>
-                            <InputTextArea class="form-control"
-                                           rows="5"
-                                           @bind-Value="patient.PatientSummary!.EventsTodo" />
-                        </div>
-
-                        <div class="d-flex gap-2">
-                            <button type="submit"
-                                    class="btn btn-primary"
-                                    disabled="@isSaving">
-                                @(isSaving ? "Saving..." : "Save Summary Changes")
-                            </button>
-
-                            <button type="button"
-                                    class="btn btn-secondary"
-                                    @onclick="ReloadPatientAsync"
-                                    disabled="@isSaving">
-                                Reload
-                            </button>
-                        </div>
-                    </EditForm>
-                </div>
+                <SummarySection Patient="patient"
+                                SummaryEditContext="summaryEditContext!"
+                                IsSummaryDirty="isSummaryDirty"
+                                IsSaving="isSaving"
+                                OnSaveSummary="SaveSummaryAsync"
+                                OnReload="ReloadPatientAsync" />
             }
-            else if (activeTab == "timeline")
-            {
-                <div>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">Timeline</h5>
-
-                        @if (isTimelineDirty)
-                        {
-                            <span class="text-warning fw-semibold">You have unsaved timeline changes.</span>
-                        }
-                        else
-                        {
-                            <span class="text-muted">Timeline is saved.</span>
-                        }
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div></div>
-
-                        <button type="button"
-                                class="btn btn-outline-primary"
-                                @onclick="AddTimelineEvent"
-                                disabled="@isSaving">
-                            Add Timeline Event
-                        </button>
-                    </div>
-
-                    @if (orderedDateEvents.Any())
-                    {
-                        <EditForm EditContext="timelineEditContext" OnValidSubmit="SaveTimelineAsync">
-                            <DataAnnotationsValidator />
-                            <ValidationSummary />
-
-                            @foreach (var item in orderedDateEvents)
-                            {
-                                <div class="border rounded p-3 mb-3">
-                                    <div class="row">
-                                        <div class="col-md-4 mb-3">
-                                            <label class="form-label">Event Date</label>
-                                            <InputDate class="form-control"
-                                                       @bind-Value="item.EventDate" />
-                                        </div>
-
-                                        <div class="col-md-8 mb-3">
-                                            <label class="form-label">Title</label>
-                                            <InputText class="form-control"
-                                                       @bind-Value="item.Title" />
-                                        </div>
-                                    </div>
-
-                                    <div class="d-flex gap-2">
-                                        <button type="button"
-                                                class="btn btn-outline-danger btn-sm"
-                                                @onclick="() => RemoveTimelineEvent(item)">
-                                            Remove From Page
-                                        </button>
-                                    </div>
-                                </div>
-                            }
-
-                            <div class="d-flex gap-2">
-                                <button type="submit"
-                                        class="btn btn-primary"
-                                        disabled="@isSaving">
-                                    @(isSaving ? "Saving..." : "Save Timeline Changes")
-                                </button>
-
-                                <button type="button"
-                                        class="btn btn-secondary"
-                                        @onclick="ReloadPatientAsync"
-                                        disabled="@isSaving">
-                                    Reload
-                                </button>
-                            </div>
-                        </EditForm>
-                    }
-                    else
-                    {
-                        <div class="alert alert-light border">
-                            No timeline events added yet.
-                        </div>
-
-                        <div class="d-flex gap-2">
-                            <button type="button"
-                                    class="btn btn-secondary"
-                                    @onclick="ReloadPatientAsync"
-                                    disabled="@isSaving">
-                                Reload
-                            </button>
-                        </div>
-                    }
-                </div>
-            }
+            @* Render Neurology through its own child component.
+               The parent page still owns save logic and dirty tracking,
+               while the shared medication catalog now lives in MedicationsManager. *@
             else if (activeTab == "neurology")
             {
-                <div>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">Neurology</h5>
-
-                        @if (isNeurologyDirty)
-                        {
-                            <span class="text-warning fw-semibold">You have unsaved neurology changes.</span>
-                        }
-                        else
-                        {
-                            <span class="text-muted">Neurology is saved.</span>
-                        }
-                    </div>
-
-                    <div class="d-flex justify-content-end gap-2 mb-3">
-                        <button type="button"
-                                class="btn btn-outline-secondary"
-                                @onclick="OpenAddMedicationModal"
-                                disabled="@isSaving">
-                            Add New Medication To Catalog
-                        </button>
-
-                        <button type="button"
-                                class="btn btn-outline-secondary"
-                                @onclick="OpenEditMedicationModal"
-                                disabled="@isSaving">
-                            Edit Medication In Catalog
-                        </button>
-                    </div>
-
-                    <EditForm EditContext="neurologyEditContext" OnValidSubmit="SaveNeurologyAsync">
-                        <DataAnnotationsValidator />
-                        <ValidationSummary />
-
-                        <div class="border rounded p-3 mb-4">
-                            <h6 class="mb-3">Glasgow Coma Scale</h6>
-
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Eye</label>
-                                    <InputSelect class="form-select"
-                                                 @bind-Value="patient.Neurology!.GcsEye">
-                                        <option value="">-- Select Eye Response --</option>
-
-                                        @foreach (var eye in Enum.GetValues<GcsEyeResponse>())
-                                        {
-                                            <option value="@eye">@GetEnumDisplayName(eye)</option>
-                                        }
-                                    </InputSelect>
-                                </div>
-
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Verbal</label>
-                                    <InputSelect class="form-select"
-                                                 @bind-Value="patient.Neurology!.GcsVerbal">
-                                        <option value="">-- Select Verbal Response --</option>
-
-                                        @foreach (var verbal in Enum.GetValues<GcsVerbalResponse>())
-                                        {
-                                            <option value="@verbal">@GetEnumDisplayName(verbal)</option>
-                                        }
-                                    </InputSelect>
-                                </div>
-
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Motor</label>
-                                    <InputSelect class="form-select"
-                                                 @bind-Value="patient.Neurology!.GcsMotor">
-                                        <option value="">-- Select Motor Response --</option>
-
-                                        @foreach (var motor in Enum.GetValues<GcsMotorResponse>())
-                                        {
-                                            <option value="@motor">@GetEnumDisplayName(motor)</option>
-                                        }
-                                    </InputSelect>
-                                </div>
-                            </div>
-
-                            <div class="alert alert-light border mb-0">
-                                <span class="fw-semibold">GCS Total:</span>
-                                @if (patient.Neurology.GcsTotal.HasValue)
-                                {
-                                    <span>@patient.Neurology.GcsTotal.Value</span>
-                                }
-                                else
-                                {
-                                    <span class="text-muted">Complete all 3 GCS fields to calculate total.</span>
-                                }
-                            </div>
-                        </div>
-
-                        <div class="row mb-4">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Pupils</label>
-                                <InputText class="form-control"
-                                           @bind-Value="patient.Neurology!.Pupils" />
-                            </div>
-
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Motor Status</label>
-                                <InputText class="form-control"
-                                           @bind-Value="patient.Neurology!.MotorStatus" />
-                            </div>
-                        </div>
-
-                        <div class="border rounded p-3 mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="mb-0">Sedation Medications</h6>
-
-                                <button type="button"
-                                        class="btn btn-outline-primary btn-sm"
-                                        @onclick="() => AddNeurologyMedication(NeurologyMedicationCategory.Sedation)"
-                                        disabled="@isSaving">
-                                    Add Sedation Medication
-                                </button>
-                            </div>
-
-                            @if (GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Sedation).Any())
-                            {
-                                @foreach (var item in GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Sedation))
-                                {
-                                    <div class="border rounded p-3 mb-3">
-                                        <div class="row">
-                                            <div class="col-md-7 mb-3">
-                                                <label class="form-label">Medication</label>
-                                                <InputSelect class="form-select"
-                                                             @bind-Value="item.MedicationId">
-                                                    <option value="0">-- Select Medication --</option>
-
-                                                    @foreach (var medication in medications)
-                                                    {
-                                                        <option value="@medication.Id">@medication.Name</option>
-                                                    }
-                                                </InputSelect>
-
-                                                @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
-                                                {
-                                                    <div class="form-text">
-                                                        Default frequency: @GetMedicationFrequency(item.MedicationId)
-                                                    </div>
-                                                }
-                                            </div>
-
-                                            <div class="col-md-5 mb-3">
-                                                <label class="form-label">Dose</label>
-                                                <InputNumber TValue="decimal?"
-                                                             class="form-control"
-                                                             @bind-Value="item.Dose" />
-                                            </div>
-                                        </div>
-
-                                        <div class="d-flex gap-2">
-                                            <button type="button"
-                                                    class="btn btn-outline-danger btn-sm"
-                                                    @onclick="() => RemoveNeurologyMedication(item)"
-                                                    disabled="@isSaving">
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                }
-                            }
-                            else
-                            {
-                                <div class="alert alert-light border mb-0">
-                                    No sedation medications added yet.
-                                </div>
-                            }
-                        </div>
-
-                        <div class="border rounded p-3 mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="mb-0">Neuro Medications</h6>
-
-                                <button type="button"
-                                        class="btn btn-outline-primary btn-sm"
-                                        @onclick="() => AddNeurologyMedication(NeurologyMedicationCategory.Neuro)"
-                                        disabled="@isSaving">
-                                    Add Neuro Medication
-                                </button>
-                            </div>
-
-                            @if (GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Neuro).Any())
-                            {
-                                @foreach (var item in GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Neuro))
-                                {
-                                    <div class="border rounded p-3 mb-3">
-                                        <div class="row">
-                                            <div class="col-md-7 mb-3">
-                                                <label class="form-label">Medication</label>
-                                                <InputSelect class="form-select"
-                                                             @bind-Value="item.MedicationId">
-                                                    <option value="0">-- Select Medication --</option>
-
-                                                    @foreach (var medication in medications)
-                                                    {
-                                                        <option value="@medication.Id">@medication.Name</option>
-                                                    }
-                                                </InputSelect>
-
-                                                @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
-                                                {
-                                                    <div class="form-text">
-                                                        Default frequency: @GetMedicationFrequency(item.MedicationId)
-                                                    </div>
-                                                }
-                                            </div>
-
-                                            <div class="col-md-5 mb-3">
-                                                <label class="form-label">Dose</label>
-                                                <InputNumber TValue="decimal?"
-                                                             class="form-control"
-                                                             @bind-Value="item.Dose" />
-                                            </div>
-                                        </div>
-
-                                        <div class="d-flex gap-2">
-                                            <button type="button"
-                                                    class="btn btn-outline-danger btn-sm"
-                                                    @onclick="() => RemoveNeurologyMedication(item)"
-                                                    disabled="@isSaving">
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                }
-                            }
-                            else
-                            {
-                                <div class="alert alert-light border mb-0">
-                                    No neuro medications added yet.
-                                </div>
-                            }
-                        </div>
-
-                        <div class="d-flex gap-2">
-                            <button type="submit"
-                                    class="btn btn-primary"
-                                    disabled="@isSaving">
-                                @(isSaving ? "Saving..." : "Save Neurology Changes")
-                            </button>
-
-                            <button type="button"
-                                    class="btn btn-secondary"
-                                    @onclick="ReloadPatientAsync"
-                                    disabled="@isSaving">
-                                Reload
-                            </button>
-                        </div>
-                    </EditForm>
-                </div>
+                <NeurologySection Patient="patient"
+                                  Medications="medications"
+                                  NeurologyEditContext="neurologyEditContext!"
+                                  IsNeurologyDirty="isNeurologyDirty"
+                                  IsSaving="isSaving"
+                                  OnSaveNeurology="SaveNeurologyAsync"
+                                  OnReload="ReloadPatientAsync"
+                                  OnAddNeurologyMedication="AddNeurologyMedication"
+                                  OnRemoveNeurologyMedication="RemoveNeurologyMedication"
+                                  OnMedicationsChanged="HandleMedicationsChangedAsync"
+                                  OnStatusMessage="HandleChildStatusMessageAsync" />
             }
 
             <hr />
 
             <div class="d-flex gap-2">
                 <a href="/patients" class="btn btn-secondary">Back</a>
-            </div>
-        </div>
-    </div>
-}
-
-@if (showAddMedicationModal)
-{
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add New Medication</h5>
-
-                    <button type="button"
-                            class="btn-close"
-                            @onclick="CloseAddMedicationModal"
-                            disabled="@isSaving">
-                    </button>
-                </div>
-
-                <div class="modal-body">
-                    @if (!string.IsNullOrWhiteSpace(newMedicationErrorMessage))
-                    {
-                        <div class="alert alert-warning">
-                            @newMedicationErrorMessage
-                        </div>
-                    }
-
-                    <div class="mb-3">
-                        <label class="form-label">Medication Name</label>
-                        <InputText class="form-control"
-                                   @bind-Value="newMedicationName" />
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Default Frequency</label>
-                        <InputText class="form-control"
-                                   @bind-Value="newMedicationFrequency" />
-                        <div class="form-text">
-                            Examples: mcg/kg/min, BD, TID, q8h
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button"
-                            class="btn btn-secondary"
-                            @onclick="CloseAddMedicationModal"
-                            disabled="@isSaving">
-                        Cancel
-                    </button>
-
-                    <button type="button"
-                            class="btn btn-primary"
-                            @onclick="SaveNewMedicationAsync"
-                            disabled="@isSaving">
-                        @(isSaving ? "Saving..." : "Save Medication")
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
-
-@if (showEditMedicationModal)
-{
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Medication</h5>
-
-                    <button type="button"
-                            class="btn-close"
-                            @onclick="CloseEditMedicationModal"
-                            disabled="@isSaving">
-                    </button>
-                </div>
-
-                <div class="modal-body">
-                    @if (!string.IsNullOrWhiteSpace(editMedicationErrorMessage))
-                    {
-                        <div class="alert alert-warning">
-                            @editMedicationErrorMessage
-                        </div>
-                    }
-
-                    @if (!medications.Any())
-                    {
-                        <div class="alert alert-light border mb-0">
-                            No medications in the catalog yet.
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="mb-3">
-                            <label class="form-label">Select Medication</label>
-                            <select class="form-select"
-                                    value="@selectedMedicationToEditId"
-                                    @onchange="OnSelectedMedicationToEditChanged">
-                                @foreach (var medication in medications)
-                                {
-                                    <option value="@medication.Id">@medication.Name</option>
-                                }
-                            </select>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Medication Name</label>
-                            <InputText class="form-control"
-                                       @bind-Value="editMedicationName" />
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Default Frequency</label>
-                            <InputText class="form-control"
-                                       @bind-Value="editMedicationFrequency" />
-                            <div class="form-text">
-                                Examples: mcg/kg/min, BD, TID, q8h
-                            </div>
-                        </div>
-                    }
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button"
-                            class="btn btn-secondary"
-                            @onclick="CloseEditMedicationModal"
-                            disabled="@isSaving">
-                        Cancel
-                    </button>
-
-                    <button type="button"
-                            class="btn btn-primary"
-                            @onclick="SaveEditedMedicationAsync"
-                            disabled="@isSaving">
-                        @(isSaving ? "Saving..." : "Save Changes")
-                    </button>
-                </div>
             </div>
         </div>
     </div>
@@ -786,20 +190,6 @@ else
     private EditContext? summaryEditContext;
     private EditContext? timelineEditContext;
     private EditContext? neurologyEditContext;
-
-    // Modal state for adding a reusable medication to the shared catalog.
-    private bool showAddMedicationModal;
-    private string newMedicationName = string.Empty;
-    private string newMedicationFrequency = string.Empty;
-    private string? newMedicationErrorMessage;
-
-    // Modal state for editing an existing reusable medication
-    // from the shared catalog.
-    private bool showEditMedicationModal;
-    private int selectedMedicationToEditId;
-    private string editMedicationName = string.Empty;
-    private string editMedicationFrequency = string.Empty;
-    private string? editMedicationErrorMessage;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -1055,6 +445,23 @@ else
         }
     }
 
+    // This small wrapper lets the child Overview component ask the parent page
+    // to add a new timeline row while keeping the actual logic in this file.
+    private Task AddTimelineEventCallbackAsync()
+    {
+        AddTimelineEvent();
+        return Task.CompletedTask;
+    }
+
+    // This small wrapper lets the child Overview component ask the parent page
+    // to remove one timeline row while keeping the actual logic in this file.
+    private Task RemoveTimelineEventCallbackAsync(PatientDateEvent item)
+    {
+        RemoveTimelineEvent(item);
+        return Task.CompletedTask;
+    }
+
+    // This method adds a new timeline row to the in-memory list before saving it to the database.
     private void AddTimelineEvent()
     {
         if (patient is null)
@@ -1075,6 +482,7 @@ else
         isTimelineDirty = true;
     }
 
+    // This method removes one timeline row from the in-memory list before the next save.
     private void RemoveTimelineEvent(PatientDateEvent item)
     {
         orderedDateEvents.Remove(item);
@@ -1111,15 +519,22 @@ else
         isNeurologyDirty = true;
     }
 
-    private IEnumerable<NeurologyMedication> GetNeurologyMedicationsByCategory(NeurologyMedicationCategory category)
+    // This method lets the shared MedicationsManager replace the parent page medication list
+    // after adding or editing a catalog item.
+    private Task HandleMedicationsChangedAsync(List<Medication> refreshedMedications)
     {
-        if (patient?.Neurology?.Medications is null)
-            return Enumerable.Empty<NeurologyMedication>();
-
-        return patient.Neurology.Medications
-            .Where(x => x.Category == category)
-            .ToList();
+        medications = refreshedMedications ?? new List<Medication>();
+        return Task.CompletedTask;
     }
+
+    // This method lets child components show a success message through the parent page alert area.
+    private Task HandleChildStatusMessageAsync(string message)
+    {
+        statusMessage = message;
+        statusCssClass = "alert-success";
+        return Task.CompletedTask;
+    }
+
 
     private async Task ReloadPatientAsync()
     {
@@ -1141,6 +556,7 @@ else
             : "btn btn-outline-primary";
     }
 
+    // This helper shows the selected Admission Unit name in the header area.
     private string? GetSelectedAdmissionUnitName()
     {
         if (patient?.AdmissionUnitCatalogId is null)
@@ -1149,194 +565,6 @@ else
         return admissionUnits
             .FirstOrDefault(x => x.Id == patient.AdmissionUnitCatalogId.Value)
             ?.Name;
-    }
-
-    private string? GetMedicationFrequency(int medicationId)
-    {
-        if (medicationId <= 0)
-            return null;
-
-        return medications
-            .FirstOrDefault(x => x.Id == medicationId)
-            ?.Frequency;
-    }
-
-    private void OpenAddMedicationModal()
-    {
-        showEditMedicationModal = false;
-        newMedicationName = string.Empty;
-        newMedicationFrequency = string.Empty;
-        newMedicationErrorMessage = null;
-        showAddMedicationModal = true;
-    }
-
-    private void CloseAddMedicationModal()
-    {
-        showAddMedicationModal = false;
-        newMedicationErrorMessage = null;
-    }
-
-    private void OpenEditMedicationModal()
-    {
-        showAddMedicationModal = false;
-        editMedicationErrorMessage = null;
-        showEditMedicationModal = true;
-
-        if (medications.Any())
-        {
-            // Preload the first medication so the modal opens in a usable state.
-            LoadMedicationForEdit(medications.First().Id);
-        }
-        else
-        {
-            selectedMedicationToEditId = 0;
-            editMedicationName = string.Empty;
-            editMedicationFrequency = string.Empty;
-        }
-    }
-
-    private void CloseEditMedicationModal()
-    {
-        showEditMedicationModal = false;
-        selectedMedicationToEditId = 0;
-        editMedicationName = string.Empty;
-        editMedicationFrequency = string.Empty;
-        editMedicationErrorMessage = null;
-    }
-
-    private void OnSelectedMedicationToEditChanged(ChangeEventArgs e)
-    {
-        if (e.Value is null)
-            return;
-
-        if (int.TryParse(e.Value.ToString(), out var medicationId))
-        {
-            LoadMedicationForEdit(medicationId);
-        }
-    }
-
-    private void LoadMedicationForEdit(int medicationId)
-    {
-        selectedMedicationToEditId = medicationId;
-
-        var selectedMedication = medications
-            .FirstOrDefault(x => x.Id == medicationId);
-
-        if (selectedMedication is null)
-        {
-            editMedicationName = string.Empty;
-            editMedicationFrequency = string.Empty;
-            return;
-        }
-
-        editMedicationName = selectedMedication.Name;
-        editMedicationFrequency = selectedMedication.Frequency ?? string.Empty;
-    }
-
-    private async Task SaveNewMedicationAsync()
-    {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(newMedicationName))
-            {
-                newMedicationErrorMessage = "Medication name is required.";
-                return;
-            }
-
-            isSaving = true;
-
-            await PatientService.AddMedicationIfMissingAsync(new Medication
-            {
-                Name = newMedicationName.Trim(),
-                Frequency = string.IsNullOrWhiteSpace(newMedicationFrequency)
-                    ? null
-                    : newMedicationFrequency.Trim()
-            });
-
-            medications = await PatientService.GetMedicationsAsync();
-
-            showAddMedicationModal = false;
-            newMedicationName = string.Empty;
-            newMedicationFrequency = string.Empty;
-            newMedicationErrorMessage = null;
-
-            statusMessage = "Medication catalog updated successfully.";
-            statusCssClass = "alert-success";
-        }
-        catch (Exception ex)
-        {
-            newMedicationErrorMessage = ex.Message;
-        }
-        finally
-        {
-            isSaving = false;
-        }
-    }
-
-    private async Task SaveEditedMedicationAsync()
-    {
-        try
-        {
-            editMedicationErrorMessage = null;
-
-            if (selectedMedicationToEditId <= 0)
-            {
-                editMedicationErrorMessage = "Please select a medication first.";
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(editMedicationName))
-            {
-                editMedicationErrorMessage = "Medication name is required.";
-                return;
-            }
-
-            isSaving = true;
-
-            await PatientService.UpdateMedicationAsync(new Medication
-            {
-                Id = selectedMedicationToEditId,
-                Name = editMedicationName.Trim(),
-                Frequency = string.IsNullOrWhiteSpace(editMedicationFrequency)
-                    ? null
-                    : editMedicationFrequency.Trim()
-            });
-
-            medications = await PatientService.GetMedicationsAsync();
-
-            // Reload the current selection from the refreshed medication list.
-            LoadMedicationForEdit(selectedMedicationToEditId);
-
-            showEditMedicationModal = false;
-            editMedicationErrorMessage = null;
-
-            statusMessage = "Medication catalog entry updated successfully.";
-            statusCssClass = "alert-success";
-        }
-        catch (Exception ex)
-        {
-            editMedicationErrorMessage = ex.Message;
-        }
-        finally
-        {
-            isSaving = false;
-        }
-    }
-
-    // Return a friendly label for enum values using [Display(Name = "...")].
-    private static string GetEnumDisplayName<TEnum>(TEnum value) where TEnum : struct, Enum
-    {
-        var memberInfo = typeof(TEnum).GetMember(value.ToString()).FirstOrDefault();
-
-        if (memberInfo is null)
-            return value.ToString();
-
-        var displayAttribute = memberInfo
-            .GetCustomAttributes(typeof(DisplayAttribute), false)
-            .OfType<DisplayAttribute>()
-            .FirstOrDefault();
-
-        return displayAttribute?.Name ?? value.ToString();
     }
 
     private void DisposeEditContexts()

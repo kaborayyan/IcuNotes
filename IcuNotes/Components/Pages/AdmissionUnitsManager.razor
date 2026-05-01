@@ -1,0 +1,327 @@
+﻿@using IcuNotes.Models
+@using Microsoft.AspNetCore.Components.Forms
+@inject IcuNotes.Services.PatientService PatientService
+
+@* This component manages the shared Admission Unit catalog UI.
+   It can be reused anywhere you need to add or edit catalog items
+   without duplicating the same buttons and modals again. *@
+<div class="d-flex gap-2 mb-3">
+    <button type="button"
+            class="btn btn-outline-secondary"
+            @onclick="OpenAddAdmissionUnitModal"
+            disabled="@IsSaving">
+        Add New Admission Unit
+    </button>
+
+    <button type="button"
+            class="btn btn-outline-secondary"
+            @onclick="OpenEditAdmissionUnitModal"
+            disabled="@IsSaving">
+        Edit Admission Unit
+    </button>
+</div>
+
+@* This modal lets the user create a new reusable Admission Unit in the shared catalog. *@
+@if (showAddAdmissionUnitModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Admission Unit</h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseAddAdmissionUnitModal"
+                            disabled="@IsSaving">
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(newAdmissionUnitErrorMessage))
+                    {
+                        <div class="alert alert-warning">
+                            @newAdmissionUnitErrorMessage
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Admission Unit Name</label>
+                        <InputText class="form-control"
+                                   @bind-Value="newAdmissionUnitName" />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseAddAdmissionUnitModal"
+                            disabled="@IsSaving">
+                        Cancel
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="SaveNewAdmissionUnitAsync"
+                            disabled="@IsSaving">
+                        @(IsSaving ? "Saving..." : "Save Admission Unit")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* This modal lets the user edit an existing reusable Admission Unit from the shared catalog. *@
+@if (showEditAdmissionUnitModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Admission Unit</h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseEditAdmissionUnitModal"
+                            disabled="@IsSaving">
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(editAdmissionUnitErrorMessage))
+                    {
+                        <div class="alert alert-warning">
+                            @editAdmissionUnitErrorMessage
+                        </div>
+                    }
+
+                    @if (!AdmissionUnits.Any())
+                    {
+                        <div class="alert alert-light border mb-0">
+                            No admission units in the catalog yet.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Select Admission Unit</label>
+                            <select class="form-select"
+                                    value="@selectedAdmissionUnitToEditId"
+                                    @onchange="OnSelectedAdmissionUnitToEditChanged">
+                                @foreach (var unit in AdmissionUnits)
+                                {
+                                    <option value="@unit.Id">@unit.Name</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Admission Unit Name</label>
+                            <InputText class="form-control"
+                                       @bind-Value="editAdmissionUnitName" />
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseEditAdmissionUnitModal"
+                            disabled="@IsSaving">
+                        Cancel
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="SaveEditedAdmissionUnitAsync"
+                            disabled="@IsSaving">
+                        @(IsSaving ? "Saving..." : "Save Changes")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // This is the current patient being edited.
+    // The component can auto-select a new Admission Unit for this patient.
+    [Parameter, EditorRequired]
+    public Patient Patient { get; set; } = default!;
+
+    // This shared catalog fills the Admission Unit dropdown and edit modal.
+    // We keep the same list instance so parent and child stay synchronized.
+    [Parameter, EditorRequired]
+    public List<AdmissionUnitCatalog> AdmissionUnits { get; set; } = new();
+
+    // This EditContext belongs to the Overview section.
+    // We notify it when the selected Admission Unit changes so dirty tracking still works.
+    [Parameter, EditorRequired]
+    public EditContext OverviewEditContext { get; set; } = default!;
+
+    // This flag lets the parent disable the manager while a save operation is running.
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    // This local state controls the Add Admission Unit modal.
+    private bool showAddAdmissionUnitModal;
+    private string newAdmissionUnitName = string.Empty;
+    private string? newAdmissionUnitErrorMessage;
+
+    // This local state controls the Edit Admission Unit modal.
+    private bool showEditAdmissionUnitModal;
+    private int selectedAdmissionUnitToEditId;
+    private string editAdmissionUnitName = string.Empty;
+    private string? editAdmissionUnitErrorMessage;
+
+    // This method opens the Add modal in a clean empty state.
+    private void OpenAddAdmissionUnitModal()
+    {
+        newAdmissionUnitName = string.Empty;
+        newAdmissionUnitErrorMessage = null;
+        showAddAdmissionUnitModal = true;
+    }
+
+    // This method closes the Add modal and clears old validation messages.
+    private void CloseAddAdmissionUnitModal()
+    {
+        showAddAdmissionUnitModal = false;
+        newAdmissionUnitErrorMessage = null;
+    }
+
+    // This method opens the Edit modal and preloads the current selected unit when possible.
+    private void OpenEditAdmissionUnitModal()
+    {
+        editAdmissionUnitErrorMessage = null;
+        showEditAdmissionUnitModal = true;
+
+        if (AdmissionUnits.Any())
+        {
+            var unitIdToLoad = Patient.AdmissionUnitCatalogId ?? AdmissionUnits.First().Id;
+            LoadAdmissionUnitForEdit(unitIdToLoad);
+        }
+        else
+        {
+            selectedAdmissionUnitToEditId = 0;
+            editAdmissionUnitName = string.Empty;
+        }
+    }
+
+    // This method closes the Edit modal and clears temporary selection state.
+    private void CloseEditAdmissionUnitModal()
+    {
+        showEditAdmissionUnitModal = false;
+        selectedAdmissionUnitToEditId = 0;
+        editAdmissionUnitName = string.Empty;
+        editAdmissionUnitErrorMessage = null;
+    }
+
+    // This method reacts when the user chooses another catalog row in the edit dropdown.
+    private void OnSelectedAdmissionUnitToEditChanged(ChangeEventArgs e)
+    {
+        if (e.Value is null)
+            return;
+
+        if (int.TryParse(e.Value.ToString(), out var admissionUnitId))
+        {
+            LoadAdmissionUnitForEdit(admissionUnitId);
+        }
+    }
+
+    // This helper loads the selected catalog row into the edit textbox.
+    private void LoadAdmissionUnitForEdit(int admissionUnitId)
+    {
+        selectedAdmissionUnitToEditId = admissionUnitId;
+
+        var selectedAdmissionUnit = AdmissionUnits
+            .FirstOrDefault(x => x.Id == admissionUnitId);
+
+        if (selectedAdmissionUnit is null)
+        {
+            editAdmissionUnitName = string.Empty;
+            return;
+        }
+
+        editAdmissionUnitName = selectedAdmissionUnit.Name;
+    }
+
+    // This method saves a new shared Admission Unit and auto-selects it for the current patient.
+    private async Task SaveNewAdmissionUnitAsync()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(newAdmissionUnitName))
+            {
+                newAdmissionUnitErrorMessage = "Admission unit name is required.";
+                return;
+            }
+
+            var savedAdmissionUnit = await PatientService.AddAdmissionUnitIfMissingAsync(new AdmissionUnitCatalog
+            {
+                Name = newAdmissionUnitName.Trim()
+            });
+
+            // Refresh the shared list in-place so the parent and all components keep the same data instance.
+            var refreshedAdmissionUnits = await PatientService.GetAdmissionUnitsAsync();
+            AdmissionUnits.Clear();
+            AdmissionUnits.AddRange(refreshedAdmissionUnits);
+
+            // Auto-select the new catalog item for the current patient.
+            Patient.AdmissionUnitCatalogId = savedAdmissionUnit.Id;
+
+            // Notify the Overview EditContext so your existing dirty tracking still works.
+            OverviewEditContext.NotifyFieldChanged(FieldIdentifier.Create(() => Patient.AdmissionUnitCatalogId));
+
+            showAddAdmissionUnitModal = false;
+            newAdmissionUnitName = string.Empty;
+            newAdmissionUnitErrorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            newAdmissionUnitErrorMessage = ex.Message;
+        }
+    }
+
+    // This method saves edits to an existing shared Admission Unit catalog row.
+    private async Task SaveEditedAdmissionUnitAsync()
+    {
+        try
+        {
+            editAdmissionUnitErrorMessage = null;
+
+            if (selectedAdmissionUnitToEditId <= 0)
+            {
+                editAdmissionUnitErrorMessage = "Please select an admission unit first.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(editAdmissionUnitName))
+            {
+                editAdmissionUnitErrorMessage = "Admission unit name is required.";
+                return;
+            }
+
+            await PatientService.UpdateAdmissionUnitAsync(new AdmissionUnitCatalog
+            {
+                Id = selectedAdmissionUnitToEditId,
+                Name = editAdmissionUnitName.Trim()
+            });
+
+            // Refresh the shared list in-place so all parts of the page see the updated names.
+            var refreshedAdmissionUnits = await PatientService.GetAdmissionUnitsAsync();
+            AdmissionUnits.Clear();
+            AdmissionUnits.AddRange(refreshedAdmissionUnits);
+
+            // Reload the selected row from the refreshed list so the modal shows the saved value.
+            LoadAdmissionUnitForEdit(selectedAdmissionUnitToEditId);
+
+            showEditAdmissionUnitModal = false;
+            editAdmissionUnitErrorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            editAdmissionUnitErrorMessage = ex.Message;
+        }
+    }
+}

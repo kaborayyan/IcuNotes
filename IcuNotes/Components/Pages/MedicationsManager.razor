@@ -1,0 +1,374 @@
+﻿@using IcuNotes.Models
+@inject IcuNotes.Services.PatientService PatientService
+
+@* This component manages the shared medication catalog.
+   It can be reused by Neurology, Cardiology, GIT, and other sections later. *@
+<div class="d-flex justify-content-end gap-2 mb-3">
+    @* This button opens the modal that adds a new medication to the shared catalog. *@
+    <button type="button"
+            class="btn btn-outline-secondary"
+            @onclick="OpenAddMedicationModal"
+            disabled="@IsBusy">
+        Add New Medication To Catalog
+    </button>
+
+    @* This button opens the modal that edits an existing medication in the shared catalog. *@
+    <button type="button"
+            class="btn btn-outline-secondary"
+            @onclick="OpenEditMedicationModal"
+            disabled="@IsBusy">
+        Edit Medication In Catalog
+    </button>
+</div>
+
+@* This modal lets the user create a new shared medication catalog item. *@
+@if (showAddMedicationModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Medication</h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseAddMedicationModal"
+                            disabled="@IsBusy">
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    @* This warning shows validation or service errors inside the add modal. *@
+                    @if (!string.IsNullOrWhiteSpace(newMedicationErrorMessage))
+                    {
+                        <div class="alert alert-warning">
+                            @newMedicationErrorMessage
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Medication Name</label>
+                        <InputText class="form-control"
+                                   @bind-Value="newMedicationName" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Default Frequency</label>
+                        <InputText class="form-control"
+                                   @bind-Value="newMedicationFrequency" />
+                        <div class="form-text">
+                            Examples: mcg/kg/min, BD, TID, q8h
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseAddMedicationModal"
+                            disabled="@IsBusy">
+                        Cancel
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="SaveNewMedicationAsync"
+                            disabled="@IsBusy">
+                        @(IsBusy ? "Saving..." : "Save Medication")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* This modal lets the user pick one existing medication and rename or update it. *@
+@if (showEditMedicationModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Medication</h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            @onclick="CloseEditMedicationModal"
+                            disabled="@IsBusy">
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    @* This warning shows validation or service errors inside the edit modal. *@
+                    @if (!string.IsNullOrWhiteSpace(editMedicationErrorMessage))
+                    {
+                        <div class="alert alert-warning">
+                            @editMedicationErrorMessage
+                        </div>
+                    }
+
+                    @if (!Medications.Any())
+                    {
+                        <div class="alert alert-light border mb-0">
+                            No medications in the catalog yet.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Select Medication</label>
+                            <select class="form-select"
+                                    value="@selectedMedicationToEditId"
+                                    @onchange="OnSelectedMedicationToEditChanged">
+                                @foreach (var medication in Medications)
+                                {
+                                    <option value="@medication.Id">@medication.Name</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Medication Name</label>
+                            <InputText class="form-control"
+                                       @bind-Value="editMedicationName" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Default Frequency</label>
+                            <InputText class="form-control"
+                                       @bind-Value="editMedicationFrequency" />
+                            <div class="form-text">
+                                Examples: mcg/kg/min, BD, TID, q8h
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseEditMedicationModal"
+                            disabled="@IsBusy">
+                        Cancel
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            @onclick="SaveEditedMedicationAsync"
+                            disabled="@IsBusy">
+                        @(IsBusy ? "Saving..." : "Save Changes")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // The parent passes the current shared medication list into this component.
+    [Parameter, EditorRequired]
+    public List<Medication> Medications { get; set; } = new();
+
+    // The parent can disable this manager while another save operation is happening.
+    [Parameter]
+    public bool IsDisabled { get; set; }
+
+    // This callback sends the refreshed medication catalog back to the parent.
+    [Parameter, EditorRequired]
+    public EventCallback<List<Medication>> OnMedicationsChanged { get; set; }
+
+    // This optional callback lets the parent show a success message after catalog changes.
+    [Parameter]
+    public EventCallback<string> OnStatusMessage { get; set; }
+
+    // These fields store the Add Medication modal state.
+    private bool showAddMedicationModal;
+    private string newMedicationName = string.Empty;
+    private string newMedicationFrequency = string.Empty;
+    private string? newMedicationErrorMessage;
+
+    // These fields store the Edit Medication modal state.
+    private bool showEditMedicationModal;
+    private int selectedMedicationToEditId;
+    private string editMedicationName = string.Empty;
+    private string editMedicationFrequency = string.Empty;
+    private string? editMedicationErrorMessage;
+
+    // This local flag prevents double-click saves inside the manager itself.
+    private bool isWorking;
+
+    // This combined flag is used by buttons and modal actions.
+    private bool IsBusy => IsDisabled || isWorking;
+
+    // This method opens the Add Medication modal and resets old errors and values.
+    private void OpenAddMedicationModal()
+    {
+        showEditMedicationModal = false;
+        newMedicationName = string.Empty;
+        newMedicationFrequency = string.Empty;
+        newMedicationErrorMessage = null;
+        showAddMedicationModal = true;
+    }
+
+    // This method closes the Add Medication modal and clears its old error message.
+    private void CloseAddMedicationModal()
+    {
+        showAddMedicationModal = false;
+        newMedicationErrorMessage = null;
+    }
+
+    // This method opens the Edit Medication modal and preloads one medication for editing.
+    private void OpenEditMedicationModal()
+    {
+        showAddMedicationModal = false;
+        editMedicationErrorMessage = null;
+        showEditMedicationModal = true;
+
+        if (Medications.Any())
+        {
+            LoadMedicationForEdit(Medications.First().Id);
+        }
+        else
+        {
+            selectedMedicationToEditId = 0;
+            editMedicationName = string.Empty;
+            editMedicationFrequency = string.Empty;
+        }
+    }
+
+    // This method closes the Edit Medication modal and clears its working values.
+    private void CloseEditMedicationModal()
+    {
+        showEditMedicationModal = false;
+        selectedMedicationToEditId = 0;
+        editMedicationName = string.Empty;
+        editMedicationFrequency = string.Empty;
+        editMedicationErrorMessage = null;
+    }
+
+    // This method loads a medication into the edit form when the selection changes.
+    private void OnSelectedMedicationToEditChanged(ChangeEventArgs e)
+    {
+        if (e.Value is null)
+            return;
+
+        if (int.TryParse(e.Value.ToString(), out var medicationId))
+        {
+            LoadMedicationForEdit(medicationId);
+        }
+    }
+
+    // This helper copies the selected medication values into the edit fields.
+    private void LoadMedicationForEdit(int medicationId)
+    {
+        selectedMedicationToEditId = medicationId;
+
+        var selectedMedication = Medications.FirstOrDefault(x => x.Id == medicationId);
+
+        if (selectedMedication is null)
+        {
+            editMedicationName = string.Empty;
+            editMedicationFrequency = string.Empty;
+            return;
+        }
+
+        editMedicationName = selectedMedication.Name;
+        editMedicationFrequency = selectedMedication.Frequency ?? string.Empty;
+    }
+
+    // This method saves a new medication into the shared catalog and refreshes the list.
+    private async Task SaveNewMedicationAsync()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(newMedicationName))
+            {
+                newMedicationErrorMessage = "Medication name is required.";
+                return;
+            }
+
+            isWorking = true;
+
+            await PatientService.AddMedicationIfMissingAsync(new Medication
+            {
+                Name = newMedicationName.Trim(),
+                Frequency = string.IsNullOrWhiteSpace(newMedicationFrequency)
+                    ? null
+                    : newMedicationFrequency.Trim()
+            });
+
+            var refreshedMedications = await PatientService.GetMedicationsAsync();
+            await OnMedicationsChanged.InvokeAsync(refreshedMedications);
+
+            showAddMedicationModal = false;
+            newMedicationName = string.Empty;
+            newMedicationFrequency = string.Empty;
+            newMedicationErrorMessage = null;
+
+            if (OnStatusMessage.HasDelegate)
+            {
+                await OnStatusMessage.InvokeAsync("Medication catalog updated successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            newMedicationErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isWorking = false;
+        }
+    }
+
+    // This method saves edits to one medication and refreshes the shared catalog list.
+    private async Task SaveEditedMedicationAsync()
+    {
+        try
+        {
+            editMedicationErrorMessage = null;
+
+            if (selectedMedicationToEditId <= 0)
+            {
+                editMedicationErrorMessage = "Please select a medication first.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(editMedicationName))
+            {
+                editMedicationErrorMessage = "Medication name is required.";
+                return;
+            }
+
+            isWorking = true;
+
+            await PatientService.UpdateMedicationAsync(new Medication
+            {
+                Id = selectedMedicationToEditId,
+                Name = editMedicationName.Trim(),
+                Frequency = string.IsNullOrWhiteSpace(editMedicationFrequency)
+                    ? null
+                    : editMedicationFrequency.Trim()
+            });
+
+            var refreshedMedications = await PatientService.GetMedicationsAsync();
+            await OnMedicationsChanged.InvokeAsync(refreshedMedications);
+
+            LoadMedicationForEdit(selectedMedicationToEditId);
+            showEditMedicationModal = false;
+            editMedicationErrorMessage = null;
+
+            if (OnStatusMessage.HasDelegate)
+            {
+                await OnStatusMessage.InvokeAsync("Medication catalog entry updated successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            editMedicationErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isWorking = false;
+        }
+    }
+}

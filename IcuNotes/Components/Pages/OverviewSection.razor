@@ -1,0 +1,273 @@
+﻿@using IcuNotes.Models
+@using IcuNotes.Constants
+@using Microsoft.AspNetCore.Components.Forms
+
+@* This component contains the Overview section UI.
+   In your new design, Timeline is shown inside the Overview section too. *@
+@if (Patient is not null)
+{
+    @* This block shows the normal overview fields and keeps its own save button. *@
+    <div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Overview</h5>
+
+            @if (IsOverviewDirty)
+            {
+                <span class="text-warning fw-semibold">You have unsaved overview changes.</span>
+            }
+            else
+            {
+                <span class="text-muted">Overview is saved.</span>
+            }
+        </div>
+
+        @* This form edits the main overview fields such as name, bed, diagnosis, and admission unit. *@
+        <EditForm EditContext="OverviewEditContext" OnValidSubmit="HandleSaveOverviewAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Name</label>
+                    <InputText class="form-control"
+                               @bind-Value="Patient.Name" />
+                    <ValidationMessage For="@(() => Patient.Name)" />
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Bed</label>
+                    <InputSelect class="form-select"
+                                 @bind-Value="Patient.Bed">
+                        <option value="">-- Select Bed --</option>
+
+                        @foreach (var bed in BedOptions.All)
+                        {
+                            <option value="@bed">@bed</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="@(() => Patient.Bed)" />
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Age</label>
+                    <InputNumber class="form-control"
+                                 @bind-Value="Patient.Age" />
+                    <ValidationMessage For="@(() => Patient.Age)" />
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Weight</label>
+                    <InputNumber class="form-control"
+                                 @bind-Value="Patient.Weight" />
+                    <ValidationMessage For="@(() => Patient.Weight)" />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Diagnosis</label>
+                <InputText class="form-control"
+                           @bind-Value="Patient.Diagnosis" />
+                <ValidationMessage For="@(() => Patient.Diagnosis)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Admission Unit</label>
+                <InputSelect class="form-select"
+                             @bind-Value="Patient.AdmissionUnitCatalogId">
+                    <option value="">-- Select Admission Unit --</option>
+
+                    @foreach (var unit in AdmissionUnits)
+                    {
+                        <option value="@unit.Id">@unit.Name</option>
+                    }
+                </InputSelect>
+            </div>
+
+            @* This reusable manager handles the shared Admission Unit catalog UI.
+               It keeps the add/edit buttons and modals outside this section so other sections
+               can reuse the same catalog manager later too. *@
+            <AdmissionUnitsManager Patient="Patient"
+                                   AdmissionUnits="AdmissionUnits"
+                                   OverviewEditContext="OverviewEditContext"
+                                   IsSaving="IsSaving" />
+
+            <div class="d-flex gap-2">
+                <button type="submit"
+                        class="btn btn-primary"
+                        disabled="@IsSaving">
+                    @(IsSaving ? "Saving..." : "Save Overview Changes")
+                </button>
+
+                <button type="button"
+                        class="btn btn-secondary"
+                        @onclick="HandleReloadAsync"
+                        disabled="@IsSaving">
+                    Reload
+                </button>
+            </div>
+        </EditForm>
+
+        <hr class="my-4" />
+
+        @* This block shows the Timeline editor, but now as part of Overview instead of its own tab. *@
+        <div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Timeline</h5>
+
+                @if (IsTimelineDirty)
+                {
+                    <span class="text-warning fw-semibold">You have unsaved timeline changes.</span>
+                }
+                else
+                {
+                    <span class="text-muted">Timeline is saved.</span>
+                }
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div></div>
+
+                <button type="button"
+                        class="btn btn-outline-primary"
+                        @onclick="HandleAddTimelineEventAsync"
+                        disabled="@IsSaving">
+                    Add Timeline Event
+                </button>
+            </div>
+
+            @if (OrderedDateEvents.Any())
+            {
+                @* This form edits the list of timeline events using its own separate save button. *@
+                <EditForm EditContext="TimelineEditContext" OnValidSubmit="HandleSaveTimelineAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    @foreach (var item in OrderedDateEvents)
+                    {
+                        <div class="border rounded p-3 mb-3">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Event Date</label>
+                                    <InputDate class="form-control"
+                                               @bind-Value="item.EventDate" />
+                                </div>
+
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label">Title</label>
+                                    <InputText class="form-control"
+                                               @bind-Value="item.Title" />
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button"
+                                        class="btn btn-outline-danger btn-sm"
+                                        @onclick="() => HandleRemoveTimelineEventAsync(item)">
+                                    Remove From Page
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="d-flex gap-2">
+                        <button type="submit"
+                                class="btn btn-primary"
+                                disabled="@IsSaving">
+                            @(IsSaving ? "Saving..." : "Save Timeline Changes")
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-secondary"
+                                @onclick="HandleReloadAsync"
+                                disabled="@IsSaving">
+                            Reload
+                        </button>
+                    </div>
+                </EditForm>
+            }
+            else
+            {
+                @* Show a friendly empty state before any timeline events are added. *@
+                <div class="alert alert-light border">
+                    No timeline events added yet.
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="HandleReloadAsync"
+                            disabled="@IsSaving">
+                        Reload
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    // This is the main Patient object passed from the parent page.
+    [Parameter, EditorRequired]
+    public Patient Patient { get; set; } = default!;
+
+    // This shared catalog fills the Admission Unit dropdown and edit modal.
+    [Parameter, EditorRequired]
+    public List<AdmissionUnitCatalog> AdmissionUnits { get; set; } = new();
+
+    // This list contains the ordered timeline rows shown in the Overview section.
+    [Parameter, EditorRequired]
+    public List<PatientDateEvent> OrderedDateEvents { get; set; } = new();
+
+    // This EditContext is created by the parent page and tracks Overview field changes.
+    [Parameter, EditorRequired]
+    public EditContext OverviewEditContext { get; set; } = default!;
+
+    // This EditContext is created by the parent page and tracks Timeline field changes.
+    [Parameter, EditorRequired]
+    public EditContext TimelineEditContext { get; set; } = default!;
+
+    // These flags control the unsaved badges and save button states.
+    [Parameter] public bool IsOverviewDirty { get; set; }
+    [Parameter] public bool IsTimelineDirty { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+
+    // These callbacks let the parent page stay in charge of saving and reloading.
+    [Parameter, EditorRequired] public EventCallback OnSaveOverview { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnSaveTimeline { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnReload { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnAddTimelineEvent { get; set; }
+    [Parameter, EditorRequired] public EventCallback<PatientDateEvent> OnRemoveTimelineEvent { get; set; }
+
+    // This small method forwards the Overview save request to the parent page.
+    private Task HandleSaveOverviewAsync()
+    {
+        return OnSaveOverview.InvokeAsync();
+    }
+
+    // This small method forwards the Timeline save request to the parent page.
+    private Task HandleSaveTimelineAsync()
+    {
+        return OnSaveTimeline.InvokeAsync();
+    }
+
+    // This small method forwards the reload request to the parent page.
+    private Task HandleReloadAsync()
+    {
+        return OnReload.InvokeAsync();
+    }
+
+    // This small method forwards the add-timeline-row request to the parent page.
+    private Task HandleAddTimelineEventAsync()
+    {
+        return OnAddTimelineEvent.InvokeAsync();
+    }
+
+    // This small method forwards the remove-timeline-row request to the parent page.
+    private Task HandleRemoveTimelineEventAsync(PatientDateEvent item)
+    {
+        return OnRemoveTimelineEvent.InvokeAsync(item);
+    }
+
+}

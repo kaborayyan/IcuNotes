@@ -287,6 +287,84 @@ namespace IcuNotes.Services
                 .ToListAsync();
         }
 
+        // Add a reusable admission unit to the shared catalog only if it does not exist already.
+        // This lets the UI create a new unit once, then reuse it later for other patients.
+        public async Task<AdmissionUnitCatalog> AddAdmissionUnitIfMissingAsync(AdmissionUnitCatalog admissionUnit)
+        {
+            await using var context = await _dbFactory.CreateDbContextAsync();
+
+            var cleanedName = (admissionUnit.Name ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(cleanedName))
+            {
+                throw new ArgumentException("Admission unit name is required.", nameof(admissionUnit));
+            }
+
+            // Look for an existing admission unit with the same name.
+            // We compare by normalized lowercase text to reduce duplicates.
+            var normalizedName = cleanedName.ToLower();
+
+            var existingAdmissionUnit = await context.AdmissionUnitCatalogs
+                .FirstOrDefaultAsync(u => u.Name.ToLower() == normalizedName);
+
+            if (existingAdmissionUnit is not null)
+            {
+                return existingAdmissionUnit;
+            }
+
+            var newAdmissionUnit = new AdmissionUnitCatalog
+            {
+                Name = cleanedName
+            };
+
+            context.AdmissionUnitCatalogs.Add(newAdmissionUnit);
+            await context.SaveChangesAsync();
+
+            return newAdmissionUnit;
+        }
+
+        // Update an existing reusable admission unit in the shared catalog.
+        // This is used when the user wants to fix spelling mistakes
+        // or rename a unit already in the dropdown list.
+        public async Task UpdateAdmissionUnitAsync(AdmissionUnitCatalog admissionUnit)
+        {
+            await using var context = await _dbFactory.CreateDbContextAsync();
+
+            var cleanedName = (admissionUnit.Name ?? string.Empty).Trim();
+
+            if (admissionUnit.Id <= 0)
+            {
+                throw new ArgumentException("Admission unit Id is invalid.", nameof(admissionUnit));
+            }
+
+            if (string.IsNullOrWhiteSpace(cleanedName))
+            {
+                throw new ArgumentException("Admission unit name is required.", nameof(admissionUnit));
+            }
+
+            var existingAdmissionUnit = await context.AdmissionUnitCatalogs
+                .FirstOrDefaultAsync(u => u.Id == admissionUnit.Id);
+
+            if (existingAdmissionUnit is null)
+            {
+                throw new InvalidOperationException("Admission unit was not found.");
+            }
+
+            var normalizedName = cleanedName.ToLower();
+
+            var duplicateAdmissionUnit = await context.AdmissionUnitCatalogs
+                .FirstOrDefaultAsync(u => u.Id != admissionUnit.Id && u.Name.ToLower() == normalizedName);
+
+            if (duplicateAdmissionUnit is not null)
+            {
+                throw new InvalidOperationException("Another admission unit with the same name already exists.");
+            }
+
+            existingAdmissionUnit.Name = cleanedName;
+
+            await context.SaveChangesAsync();
+        }
+
         // Return all reusable medications for dropdown lists
         public async Task<List<Medication>> GetMedicationsAsync()
         {
@@ -518,33 +596,31 @@ namespace IcuNotes.Services
             await context.SaveChangesAsync();
         }
 
-        // Helper method to extract the letter part of the bed value
-        // Example: "B12" -> "B"
+        // Small helper: read the letter part of the bed name.
+        // Example: "B-12" -> "B"
         private static string GetBedPrefix(string? bed)
         {
             if (string.IsNullOrWhiteSpace(bed))
                 return string.Empty;
 
-            var letters = new string(bed
-                .TakeWhile(c => !char.IsDigit(c))
-                .ToArray());
-
-            return letters.Trim().ToUpper();
+            var parts = bed.Split('-', StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length > 0 ? parts[0] : bed;
         }
 
-        // Helper method to extract the number part of the bed value
-        // Example: "B12" -> 12
+        // Small helper: read the numeric part of the bed name.
+        // Example: "B-12" -> 12
+        // If parsing fails, return a large number so unknown values go last.
         private static int GetBedNumber(string? bed)
         {
             if (string.IsNullOrWhiteSpace(bed))
                 return int.MaxValue;
 
-            var digits = new string(bed
-                .SkipWhile(c => !char.IsDigit(c))
-                .TakeWhile(char.IsDigit)
-                .ToArray());
+            var parts = bed.Split('-', StringSplitOptions.RemoveEmptyEntries);
 
-            return int.TryParse(digits, out var number) ? number : int.MaxValue;
+            if (parts.Length > 1 && int.TryParse(parts[1], out var number))
+                return number;
+
+            return int.MaxValue;
         }
     }
 }

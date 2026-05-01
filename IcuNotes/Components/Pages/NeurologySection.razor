@@ -1,0 +1,383 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using IcuNotes.Models
+@using Microsoft.AspNetCore.Components.Forms
+
+@* This component contains the Neurology section UI.
+   It uses the shared MedicationsManager component for catalog add/edit work.
+   The parent page still owns patient saving, dirty tracking, and patient reload. *@
+@if (Patient is not null)
+{
+    @* This block shows the section title and whether Neurology has unsaved changes. *@
+    <div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Neurology</h5>
+
+            @if (IsNeurologyDirty)
+            {
+                <span class="text-warning fw-semibold">You have unsaved neurology changes.</span>
+            }
+            else
+            {
+                <span class="text-muted">Neurology is saved.</span>
+            }
+        </div>
+
+        @* This reusable manager handles adding and editing shared catalog medications.
+           Neurology stays focused only on neurology-specific medication rows. *@
+        <MedicationsManager Medications="Medications"
+                            IsDisabled="IsSaving"
+                            OnMedicationsChanged="HandleMedicationsChangedAsync"
+                            OnStatusMessage="HandleStatusMessageAsync" />
+
+        @* This form edits the neurology fields but sends the save action back to the parent page. *@
+        <EditForm EditContext="NeurologyEditContext" OnValidSubmit="HandleSaveNeurologyAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            @* This block contains the Glasgow Coma Scale selectors and total score display. *@
+            <div class="border rounded p-3 mb-4">
+                <h6 class="mb-3">Glasgow Coma Scale</h6>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Eye</label>
+                        <InputSelect class="form-select"
+                                     @bind-Value="Patient.Neurology!.GcsEye">
+                            <option value="">-- Select Eye Response --</option>
+
+                            @foreach (var eye in Enum.GetValues<GcsEyeResponse>())
+                            {
+                                <option value="@eye">@GetEnumDisplayName(eye)</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Verbal</label>
+                        <InputSelect class="form-select"
+                                     @bind-Value="Patient.Neurology!.GcsVerbal">
+                            <option value="">-- Select Verbal Response --</option>
+
+                            @foreach (var verbal in Enum.GetValues<GcsVerbalResponse>())
+                            {
+                                <option value="@verbal">@GetEnumDisplayName(verbal)</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Motor</label>
+                        <InputSelect class="form-select"
+                                     @bind-Value="Patient.Neurology!.GcsMotor">
+                            <option value="">-- Select Motor Response --</option>
+
+                            @foreach (var motor in Enum.GetValues<GcsMotorResponse>())
+                            {
+                                <option value="@motor">@GetEnumDisplayName(motor)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                </div>
+
+                <div class="alert alert-light border mb-0">
+                    <span class="fw-semibold">GCS Total:</span>
+                    @if (Patient.Neurology.GcsTotal.HasValue)
+                    {
+                        <span>@Patient.Neurology.GcsTotal.Value</span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">Complete all 3 GCS fields to calculate total.</span>
+                    }
+                </div>
+            </div>
+
+            @* These simple fields store the free-text pupil and motor exam notes. *@
+            <div class="row mb-4">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Pupils</label>
+                    <InputText class="form-control"
+                               @bind-Value="Patient.Neurology!.Pupils" />
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Motor Status</label>
+                    <InputText class="form-control"
+                               @bind-Value="Patient.Neurology!.MotorStatus" />
+                </div>
+            </div>
+
+            @* This block edits the sedation medication list. *@
+            <div class="border rounded p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">Sedation Medications</h6>
+
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            @onclick="() => HandleAddNeurologyMedicationAsync(NeurologyMedicationCategory.Sedation)"
+                            disabled="@IsSaving">
+                        Add Sedation Medication
+                    </button>
+                </div>
+
+                @if (GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Sedation).Any())
+                {
+                    @foreach (var item in GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Sedation))
+                    {
+                        <div class="border rounded p-3 mb-3">
+                            <div class="row">
+                                <div class="col-md-7 mb-3">
+                                    <label class="form-label">Medication</label>
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="item.MedicationId">
+                                        <option value="0">-- Select Medication --</option>
+
+                                        @foreach (var medication in Medications)
+                                        {
+                                            <option value="@medication.Id">@medication.Name</option>
+                                        }
+                                    </InputSelect>
+
+                                    @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                    {
+                                        <div class="form-text">
+                                            Default frequency: @GetMedicationFrequency(item.MedicationId)
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="col-md-5 mb-3">
+                                    <label class="form-label">Dose</label>
+                                    <InputNumber TValue="decimal?"
+                                                 class="form-control"
+                                                 @bind-Value="item.Dose" />
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button"
+                                        class="btn btn-outline-danger btn-sm"
+                                        @onclick="() => HandleRemoveNeurologyMedicationAsync(item)"
+                                        disabled="@IsSaving">
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-light border mb-0">
+                        No sedation medications added yet.
+                    </div>
+                }
+            </div>
+
+            @* This block edits the neuro medication list. *@
+            <div class="border rounded p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">Neuro Medications</h6>
+
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            @onclick="() => HandleAddNeurologyMedicationAsync(NeurologyMedicationCategory.Neuro)"
+                            disabled="@IsSaving">
+                        Add Neuro Medication
+                    </button>
+                </div>
+
+                @if (GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Neuro).Any())
+                {
+                    @foreach (var item in GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Neuro))
+                    {
+                        <div class="border rounded p-3 mb-3">
+                            <div class="row">
+                                <div class="col-md-7 mb-3">
+                                    <label class="form-label">Medication</label>
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="item.MedicationId">
+                                        <option value="0">-- Select Medication --</option>
+
+                                        @foreach (var medication in Medications)
+                                        {
+                                            <option value="@medication.Id">@medication.Name</option>
+                                        }
+                                    </InputSelect>
+
+                                    @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                    {
+                                        <div class="form-text">
+                                            Default frequency: @GetMedicationFrequency(item.MedicationId)
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="col-md-5 mb-3">
+                                    <label class="form-label">Dose</label>
+                                    <InputNumber TValue="decimal?"
+                                                 class="form-control"
+                                                 @bind-Value="item.Dose" />
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button"
+                                        class="btn btn-outline-danger btn-sm"
+                                        @onclick="() => HandleRemoveNeurologyMedicationAsync(item)"
+                                        disabled="@IsSaving">
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-light border mb-0">
+                        No neuro medications added yet.
+                    </div>
+                }
+            </div>
+
+            @* These buttons keep save and reload behavior controlled by the parent page. *@
+            <div class="d-flex gap-2">
+                <button type="submit"
+                        class="btn btn-primary"
+                        disabled="@IsSaving">
+                    @(IsSaving ? "Saving..." : "Save Neurology Changes")
+                </button>
+
+                <button type="button"
+                        class="btn btn-secondary"
+                        @onclick="HandleReloadAsync"
+                        disabled="@IsSaving">
+                    Reload
+                </button>
+            </div>
+        </EditForm>
+    </div>
+}
+
+@code {
+    // The parent page passes the current patient object into this component.
+    [Parameter, EditorRequired]
+    public Patient? Patient { get; set; }
+
+    // The parent page passes the reusable medication catalog for dropdown lists.
+    [Parameter, EditorRequired]
+    public List<Medication> Medications { get; set; } = new();
+
+    // The parent page passes the EditContext so dirty tracking stays in one place.
+    [Parameter, EditorRequired]
+    public EditContext NeurologyEditContext { get; set; } = default!;
+
+    // This flag tells the component whether to show the unsaved warning for Neurology.
+    [Parameter]
+    public bool IsNeurologyDirty { get; set; }
+
+    // This flag disables buttons while the parent page is saving data.
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    // The parent page provides the actual save method for the Neurology section.
+    [Parameter, EditorRequired]
+    public EventCallback OnSaveNeurology { get; set; }
+
+    // The parent page provides the reload method so this component stays UI-focused.
+    [Parameter, EditorRequired]
+    public EventCallback OnReload { get; set; }
+
+    // The parent page provides the method that adds a medication row to the section.
+    [Parameter, EditorRequired]
+    public EventCallback<NeurologyMedicationCategory> OnAddNeurologyMedication { get; set; }
+
+    // The parent page provides the method that removes a medication row from the section.
+    [Parameter, EditorRequired]
+    public EventCallback<NeurologyMedication> OnRemoveNeurologyMedication { get; set; }
+
+    // This callback lets the parent page replace its medication catalog list
+    // after the shared MedicationsManager adds or edits a catalog item.
+    [Parameter]
+    public EventCallback<List<Medication>> OnMedicationsChanged { get; set; }
+
+    // This callback lets the component forward status messages to the parent page.
+    [Parameter]
+    public EventCallback<string> OnStatusMessage { get; set; }
+
+    // This method asks the parent page to save the Neurology section.
+    private async Task HandleSaveNeurologyAsync()
+    {
+        await OnSaveNeurology.InvokeAsync();
+    }
+
+    // This method asks the parent page to reload the patient data.
+    private async Task HandleReloadAsync()
+    {
+        await OnReload.InvokeAsync();
+    }
+
+    // This method asks the parent page to add a new neurology medication row.
+    private async Task HandleAddNeurologyMedicationAsync(NeurologyMedicationCategory category)
+    {
+        await OnAddNeurologyMedication.InvokeAsync(category);
+    }
+
+    // This method asks the parent page to remove one neurology medication row.
+    private async Task HandleRemoveNeurologyMedicationAsync(NeurologyMedication item)
+    {
+        await OnRemoveNeurologyMedication.InvokeAsync(item);
+    }
+
+    // This method receives the refreshed medication catalog from MedicationsManager.
+    // It updates the local list immediately and then informs the parent page too.
+    private async Task HandleMedicationsChangedAsync(List<Medication> refreshedMedications)
+    {
+        Medications = refreshedMedications ?? new List<Medication>();
+        await OnMedicationsChanged.InvokeAsync(Medications);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // This method forwards a success message to the parent page when available.
+    private async Task HandleStatusMessageAsync(string message)
+    {
+        await OnStatusMessage.InvokeAsync(message);
+    }
+
+    // This helper returns the rows for only one medication category at a time.
+    private IEnumerable<NeurologyMedication> GetNeurologyMedicationsByCategory(NeurologyMedicationCategory category)
+    {
+        if (Patient?.Neurology?.Medications is null)
+            return Enumerable.Empty<NeurologyMedication>();
+
+        return Patient.Neurology.Medications
+            .Where(x => x.Category == category)
+            .ToList();
+    }
+
+    // This helper looks up the default frequency text for the selected medication.
+    private string? GetMedicationFrequency(int medicationId)
+    {
+        if (medicationId <= 0)
+            return null;
+
+        return Medications
+            .FirstOrDefault(x => x.Id == medicationId)
+            ?.Frequency;
+    }
+
+    // This helper shows friendly enum labels using the [Display] attribute.
+    private static string GetEnumDisplayName<TEnum>(TEnum value) where TEnum : struct, Enum
+    {
+        var memberInfo = typeof(TEnum).GetMember(value.ToString()).FirstOrDefault();
+
+        if (memberInfo is null)
+            return value.ToString();
+
+        var displayAttribute = memberInfo
+            .GetCustomAttributes(typeof(DisplayAttribute), false)
+            .OfType<DisplayAttribute>()
+            .FirstOrDefault();
+
+        return displayAttribute?.Name ?? value.ToString();
+    }
+}
