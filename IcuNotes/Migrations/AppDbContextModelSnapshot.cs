@@ -15,7 +15,7 @@ namespace IcuNotes.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.5");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
 
             modelBuilder.Entity("IcuNotes.Models.AdmissionUnitCatalog", b =>
                 {
@@ -83,6 +83,81 @@ namespace IcuNotes.Migrations
                     b.HasIndex("ArchivedPatientId");
 
                     b.ToTable("ArchivedPatientDateEvents");
+                });
+
+            modelBuilder.Entity("IcuNotes.Models.Cardiology", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("CardiacIndex")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("CardiacOutput")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("CentralVenousPressure")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("DiastolicBloodPressure")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("HeartRate")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("InferiorVenaCava")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("PulmonaryCapillaryWedgePressure")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("SystemicVascularResistance")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("SystolicBloodPressure")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatientId")
+                        .IsUnique();
+
+                    b.ToTable("Cardiologies");
+                });
+
+            modelBuilder.Entity("IcuNotes.Models.CardiologyMedication", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CardiologyId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("Dose")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("MedicationId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CardiologyId");
+
+                    b.HasIndex("MedicationId");
+
+                    b.ToTable("CardiologyMedications");
                 });
 
             modelBuilder.Entity("IcuNotes.Models.Medication", b =>
@@ -263,6 +338,36 @@ namespace IcuNotes.Migrations
                     b.Navigation("ArchivedPatient");
                 });
 
+            modelBuilder.Entity("IcuNotes.Models.Cardiology", b =>
+                {
+                    b.HasOne("IcuNotes.Models.Patient", "Patient")
+                        .WithOne("Cardiology")
+                        .HasForeignKey("IcuNotes.Models.Cardiology", "PatientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("IcuNotes.Models.CardiologyMedication", b =>
+                {
+                    b.HasOne("IcuNotes.Models.Cardiology", "Cardiology")
+                        .WithMany("Medications")
+                        .HasForeignKey("CardiologyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IcuNotes.Models.Medication", "Medication")
+                        .WithMany()
+                        .HasForeignKey("MedicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Cardiology");
+
+                    b.Navigation("Medication");
+                });
+
             modelBuilder.Entity("IcuNotes.Models.Neurology", b =>
                 {
                     b.HasOne("IcuNotes.Models.Patient", "Patient")
@@ -330,6 +435,11 @@ namespace IcuNotes.Migrations
                     b.Navigation("ArchivedPatientDateEvents");
                 });
 
+            modelBuilder.Entity("IcuNotes.Models.Cardiology", b =>
+                {
+                    b.Navigation("Medications");
+                });
+
             modelBuilder.Entity("IcuNotes.Models.Neurology", b =>
                 {
                     b.Navigation("Medications");
@@ -337,6 +447,8 @@ namespace IcuNotes.Migrations
 
             modelBuilder.Entity("IcuNotes.Models.Patient", b =>
                 {
+                    b.Navigation("Cardiology");
+
                     b.Navigation("Neurology");
 
                     b.Navigation("PatientDateEvents");

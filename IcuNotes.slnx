@@ -1,7 +1,5 @@
 <Solution>
-  <Project Path="IcuNotes.Migrations/IcuNotes.Migrations.csproj" Id="98f32020-df8e-47d9-bfe7-a302727cd61d">
-    <Build Solution="Debug|*" Project="false" />
-  </Project>
+  <Project Path="IcuNotes.Migrations/IcuNotes.Migrations.csproj" Id="98f32020-df8e-47d9-bfe7-a302727cd61d" />
   <Project Path="IcuNotes/IcuNotes.csproj">
     <Deploy Solution="Debug|*" />
   </Project>

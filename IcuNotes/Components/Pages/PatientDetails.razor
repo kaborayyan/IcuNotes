@@ -105,11 +105,20 @@ else
                             <span class="badge bg-warning text-dark ms-2">Unsaved</span>
                         }
                     </button>
+
+                    <button class="@GetTabButtonClass("cardiology")"
+                            @onclick='() => SelectTab("cardiology")'>
+                        Cardiology
+                        @if (isCardiologyDirty)
+                        {
+                            <span class="badge bg-warning text-dark ms-2">Unsaved</span>
+                        }
+                    </button>
                 </div>
             </div>
 
             @* Render Overview through its own child component.
-               This is the first step in splitting PatientDetails into smaller files. *@
+               Overview also contains the timeline. *@
             @if (activeTab == "overview")
             {
                 <OverviewSection Patient="patient"
@@ -127,7 +136,7 @@ else
                                  OnRemoveTimelineEvent="RemoveTimelineEventCallbackAsync" />
             }
             @* Render Summary through its own child component.
-               The parent page still owns save logic and dirty tracking for now. *@
+               The parent page still owns save logic and dirty tracking. *@
             else if (activeTab == "summary")
             {
                 <SummarySection Patient="patient"
@@ -138,8 +147,7 @@ else
                                 OnReload="ReloadPatientAsync" />
             }
             @* Render Neurology through its own child component.
-               The parent page still owns save logic and dirty tracking,
-               while the shared medication catalog now lives in MedicationsManager. *@
+               The parent page still owns save logic and dirty tracking. *@
             else if (activeTab == "neurology")
             {
                 <NeurologySection Patient="patient"
@@ -153,6 +161,23 @@ else
                                   OnRemoveNeurologyMedication="RemoveNeurologyMedication"
                                   OnMedicationsChanged="HandleMedicationsChangedAsync"
                                   OnStatusMessage="HandleChildStatusMessageAsync" />
+            }
+            @* Render Cardiology through its own child component.
+               The parent page owns save logic, dirty tracking, reload,
+               and medication add/remove logic. *@
+            else if (activeTab == "cardiology")
+            {
+                <CardiologySection Patient="patient"
+                                   Medications="medications"
+                                   CardiologyEditContext="cardiologyEditContext!"
+                                   IsCardiologyDirty="isCardiologyDirty"
+                                   IsSaving="isSaving"
+                                   OnSaveCardiology="SaveCardiologyAsync"
+                                   OnReload="ReloadPatientAsync"
+                                   OnAddCardiologyMedication="AddCardiologyMedication"
+                                   OnRemoveCardiologyMedication="RemoveCardiologyMedication"
+                                   OnMedicationsChanged="HandleMedicationsChangedAsync"
+                                   OnStatusMessage="HandleChildStatusMessageAsync" />
             }
 
             <hr />
@@ -180,16 +205,20 @@ else
     private List<Medication> medications = new();
 
     // These flags are the source for the notification badges.
+    // A dirty section means the user changed something but has not saved yet.
     private bool isOverviewDirty;
     private bool isSummaryDirty;
     private bool isTimelineDirty;
     private bool isNeurologyDirty;
+    private bool isCardiologyDirty;
 
     // Separate EditContexts let us know which section changed.
+    // Each section has its own EditContext so we can show the correct Unsaved badge.
     private EditContext? overviewEditContext;
     private EditContext? summaryEditContext;
     private EditContext? timelineEditContext;
     private EditContext? neurologyEditContext;
+    private EditContext? cardiologyEditContext;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -244,6 +273,13 @@ else
 
         patient.Neurology.Medications ??= new List<NeurologyMedication>();
 
+        patient.Cardiology ??= new Cardiology
+        {
+            PatientId = patient.Id
+        };
+
+        patient.Cardiology.Medications ??= new List<CardiologyMedication>();
+
         orderedDateEvents = patient.PatientDateEvents
             .OrderBy(e => e.EventDate)
             .ToList();
@@ -271,6 +307,9 @@ else
 
         neurologyEditContext = new EditContext(patient.Neurology!);
         neurologyEditContext.OnFieldChanged += HandleNeurologyFieldChanged;
+
+        cardiologyEditContext = new EditContext(patient.Cardiology!);
+        cardiologyEditContext.OnFieldChanged += HandleCardiologyFieldChanged;
     }
 
     private void HandleOverviewFieldChanged(object? sender, FieldChangedEventArgs e)
@@ -297,12 +336,19 @@ else
         InvokeAsync(StateHasChanged);
     }
 
+    private void HandleCardiologyFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        isCardiologyDirty = true;
+        InvokeAsync(StateHasChanged);
+    }
+
     private void ResetDirtyFlags()
     {
         isOverviewDirty = false;
         isSummaryDirty = false;
         isTimelineDirty = false;
         isNeurologyDirty = false;
+        isCardiologyDirty = false;
     }
 
     private async Task SaveOverviewAsync()
@@ -445,6 +491,52 @@ else
         }
     }
 
+    private async Task SaveCardiologyAsync()
+    {
+        if (patient is null)
+            return;
+
+        try
+        {
+            isSaving = true;
+
+            // Make sure the cardiology section exists and is linked to this patient.
+            patient.Cardiology ??= new Cardiology
+            {
+                PatientId = patient.Id
+            };
+
+            patient.Cardiology.PatientId = patient.Id;
+            patient.Cardiology.Medications ??= new List<CardiologyMedication>();
+
+            await PatientService.UpdateAsync(patient);
+
+            // Reload after save so new medication rows get real database Ids
+            // and so Medication navigation properties are refreshed.
+            patient = await PatientService.GetByIdAsync(Id);
+
+            if (patient is not null)
+            {
+                EnsurePatientChildObjects();
+                CreateEditContexts();
+            }
+
+            isCardiologyDirty = false;
+
+            statusMessage = "Cardiology changes saved successfully.";
+            statusCssClass = "alert-success";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error while saving cardiology changes: {ex.Message}";
+            statusCssClass = "alert-danger";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
     // This small wrapper lets the child Overview component ask the parent page
     // to add a new timeline row while keeping the actual logic in this file.
     private Task AddTimelineEventCallbackAsync()
@@ -519,6 +611,38 @@ else
         isNeurologyDirty = true;
     }
 
+    private void AddCardiologyMedication(CardiologyMedicationCategory category)
+    {
+        if (patient is null)
+            return;
+
+        patient.Cardiology ??= new Cardiology
+        {
+            PatientId = patient.Id
+        };
+
+        patient.Cardiology.Medications ??= new List<CardiologyMedication>();
+
+        patient.Cardiology.Medications.Add(new CardiologyMedication
+        {
+            Category = category
+        });
+
+        CreateEditContexts();
+        isCardiologyDirty = true;
+    }
+
+    private void RemoveCardiologyMedication(CardiologyMedication item)
+    {
+        if (patient?.Cardiology is null)
+            return;
+
+        patient.Cardiology.Medications.Remove(item);
+
+        CreateEditContexts();
+        isCardiologyDirty = true;
+    }
+
     // This method lets the shared MedicationsManager replace the parent page medication list
     // after adding or editing a catalog item.
     private Task HandleMedicationsChangedAsync(List<Medication> refreshedMedications)
@@ -534,7 +658,6 @@ else
         statusCssClass = "alert-success";
         return Task.CompletedTask;
     }
-
 
     private async Task ReloadPatientAsync()
     {
@@ -580,6 +703,9 @@ else
 
         if (neurologyEditContext is not null)
             neurologyEditContext.OnFieldChanged -= HandleNeurologyFieldChanged;
+
+        if (cardiologyEditContext is not null)
+            cardiologyEditContext.OnFieldChanged -= HandleCardiologyFieldChanged;
     }
 
     public void Dispose()

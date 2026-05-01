@@ -40,6 +40,12 @@ namespace IcuNotes.Data
         // Many medication rows can belong to one neurology section.
         public DbSet<NeurologyMedication> NeurologyMedications { get; set; } = null!;
 
+        // One cardiology row per patient.
+        public DbSet<Cardiology> Cardiologies { get; set; } = null!;
+
+        // Many medication rows can belong to one cardiology section.
+        public DbSet<CardiologyMedication> CardiologyMedications { get; set; } = null!;
+
         // This is the place for extra database configuration.
         // We use it to define relationships clearly so EF Core
         // does not guess the wrong foreign keys.
@@ -76,6 +82,15 @@ namespace IcuNotes.Data
                 .HasForeignKey<Neurology>(n => n.PatientId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // Patient <-> Cardiology
+            // One patient has one cardiology record, and one cardiology record
+            // belongs to one patient.
+            modelBuilder.Entity<Patient>()
+                .HasOne(p => p.Cardiology)
+                .WithOne(c => c.Patient)
+                .HasForeignKey<Cardiology>(c => c.PatientId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             // Patient <-> PatientDateEvent
             // One patient can have many date events,
             // and each date event belongs to one patient.
@@ -105,6 +120,26 @@ namespace IcuNotes.Data
                 .HasForeignKey(nm => nm.MedicationId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Cardiology <-> CardiologyMedication
+            // One cardiology section can have many medication rows,
+            // and each medication row belongs to one cardiology section.
+            modelBuilder.Entity<Cardiology>()
+                .HasMany(c => c.Medications)
+                .WithOne(cm => cm.Cardiology)
+                .HasForeignKey(cm => cm.CardiologyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // CardiologyMedication -> Medication
+            // Many cardiology medication rows can point to one shared
+            // medication catalog item.
+            // Restrict delete so a medication cannot be removed from the catalog
+            // while it is still being used by patients.
+            modelBuilder.Entity<CardiologyMedication>()
+                .HasOne(cm => cm.Medication)
+                .WithMany()
+                .HasForeignKey(cm => cm.MedicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // ArchivedPatient <-> ArchivedPatientDateEvent
             // One archived patient can have many archived date events,
             // and each archived date event belongs to one archived patient.
@@ -124,6 +159,12 @@ namespace IcuNotes.Data
             // which enforces one neurology record per patient.
             modelBuilder.Entity<Neurology>()
                 .HasIndex(n => n.PatientId)
+                .IsUnique();
+
+            // This makes PatientId unique in Cardiologies,
+            // which enforces one cardiology record per patient.
+            modelBuilder.Entity<Cardiology>()
+                .HasIndex(c => c.PatientId)
                 .IsUnique();
 
             // This makes medication names unique in the shared catalog.

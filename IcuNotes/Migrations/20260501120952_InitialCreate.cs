@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace IcuNotes.Migrations
 {
     /// <inheritdoc />
-    public partial class ReCreatingEverything : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -101,6 +101,35 @@ namespace IcuNotes.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Cardiologies",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    PatientId = table.Column<int>(type: "INTEGER", nullable: false),
+                    HeartRate = table.Column<int>(type: "INTEGER", nullable: true),
+                    SystolicBloodPressure = table.Column<int>(type: "INTEGER", nullable: true),
+                    DiastolicBloodPressure = table.Column<int>(type: "INTEGER", nullable: true),
+                    CentralVenousPressure = table.Column<int>(type: "INTEGER", nullable: true),
+                    InferiorVenaCava = table.Column<int>(type: "INTEGER", nullable: true),
+                    CardiacIndex = table.Column<decimal>(type: "TEXT", nullable: true),
+                    CardiacOutput = table.Column<decimal>(type: "TEXT", nullable: true),
+                    SystemicVascularResistance = table.Column<int>(type: "INTEGER", nullable: true),
+                    PulmonaryCapillaryWedgePressure = table.Column<int>(type: "INTEGER", nullable: true),
+                    Notes = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Cardiologies", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Cardiologies_Patients_PatientId",
+                        column: x => x.PatientId,
+                        principalTable: "Patients",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Neurologies",
                 columns: table => new
                 {
@@ -167,6 +196,34 @@ namespace IcuNotes.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CardiologyMedications",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    CardiologyId = table.Column<int>(type: "INTEGER", nullable: false),
+                    MedicationId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Category = table.Column<int>(type: "INTEGER", nullable: false),
+                    Dose = table.Column<decimal>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CardiologyMedications", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_CardiologyMedications_Cardiologies_CardiologyId",
+                        column: x => x.CardiologyId,
+                        principalTable: "Cardiologies",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CardiologyMedications_Medications_MedicationId",
+                        column: x => x.MedicationId,
+                        principalTable: "Medications",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "NeurologyMedications",
                 columns: table => new
                 {
@@ -198,6 +255,22 @@ namespace IcuNotes.Migrations
                 name: "IX_ArchivedPatientDateEvents_ArchivedPatientId",
                 table: "ArchivedPatientDateEvents",
                 column: "ArchivedPatientId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Cardiologies_PatientId",
+                table: "Cardiologies",
+                column: "PatientId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CardiologyMedications_CardiologyId",
+                table: "CardiologyMedications",
+                column: "CardiologyId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CardiologyMedications_MedicationId",
+                table: "CardiologyMedications",
+                column: "MedicationId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Medications_Name",
@@ -245,6 +318,9 @@ namespace IcuNotes.Migrations
                 name: "ArchivedPatientDateEvents");
 
             migrationBuilder.DropTable(
+                name: "CardiologyMedications");
+
+            migrationBuilder.DropTable(
                 name: "NeurologyMedications");
 
             migrationBuilder.DropTable(
@@ -255,6 +331,9 @@ namespace IcuNotes.Migrations
 
             migrationBuilder.DropTable(
                 name: "ArchivedPatients");
+
+            migrationBuilder.DropTable(
+                name: "Cardiologies");
 
             migrationBuilder.DropTable(
                 name: "Medications");

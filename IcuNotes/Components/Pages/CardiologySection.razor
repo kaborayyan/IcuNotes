@@ -1,0 +1,427 @@
+﻿@using IcuNotes.Models
+@using Microsoft.AspNetCore.Components.Forms
+
+@* This component contains the Cardiology section UI.
+   It follows the same pattern as NeurologySection.razor.
+
+   Important:
+   - This component displays and edits cardiology data.
+   - It does not directly save to the database.
+   - The parent PatientDetails.razor page owns saving, dirty tracking, and reload. *@
+
+@if (Patient?.Cardiology is not null)
+{
+    <div>
+        @* This block shows the section title and whether Cardiology has unsaved changes. *@
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Cardiology</h5>
+
+            @if (IsCardiologyDirty)
+            {
+                <span class="text-warning fw-semibold">You have unsaved cardiology changes.</span>
+            }
+            else
+            {
+                <span class="text-muted">Cardiology is saved.</span>
+            }
+        </div>
+
+        @* This reusable manager handles adding and editing shared catalog medications.
+           Cardiology stays focused only on cardiology-specific medication rows. *@
+        <MedicationsManager Medications="Medications"
+                            IsDisabled="IsSaving"
+                            OnMedicationsChanged="HandleMedicationsChangedAsync"
+                            OnStatusMessage="HandleStatusMessageAsync" />
+
+        @* This form edits the cardiology fields but sends the save action back to the parent page. *@
+        <EditForm EditContext="CardiologyEditContext" OnValidSubmit="HandleSaveCardiologyAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            @* Core daily cardiovascular observations. *@
+            <div class="border rounded p-3 mb-4">
+                <h6 class="mb-3">Basic Hemodynamics</h6>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">HR</label>
+                        <InputNumber TValue="int?"
+                                     class="form-control"
+                                     @bind-Value="Patient.Cardiology.HeartRate" />
+                        <div class="form-text">Heart rate.</div>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">SBP</label>
+                        <InputNumber TValue="int?"
+                                     class="form-control"
+                                     @bind-Value="Patient.Cardiology.SystolicBloodPressure" />
+                        <div class="form-text">Systolic blood pressure.</div>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">DBP</label>
+                        <InputNumber TValue="int?"
+                                     class="form-control"
+                                     @bind-Value="Patient.Cardiology.DiastolicBloodPressure" />
+                        <div class="form-text">Diastolic blood pressure.</div>
+                    </div>
+                </div>
+
+                @* MAP is calculated in Cardiology.cs.
+                   It is not directly edited and not stored in the database. *@
+                <div class="alert alert-light border mb-0">
+                    <span class="fw-semibold">MAP:</span>
+
+                    @if (Patient.Cardiology.MeanArterialPressure.HasValue)
+                    {
+                        <span>@Patient.Cardiology.MeanArterialPressure.Value</span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">Enter SBP and DBP to calculate MAP.</span>
+                    }
+                </div>
+            </div>
+
+            @* Additional common ICU cardiology measurements. *@
+            <div class="border rounded p-3 mb-4">
+                <h6 class="mb-3">Volume / Echo Clues</h6>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">CVP</label>
+                        <InputNumber TValue="int?"
+                                     class="form-control"
+                                     @bind-Value="Patient.Cardiology.CentralVenousPressure" />
+                        <div class="form-text">Central venous pressure.</div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">IVC</label>
+                        <InputNumber TValue="int?"
+                                     class="form-control"
+                                     @bind-Value="Patient.Cardiology.InferiorVenaCava" />
+                        <div class="form-text">Inferior vena cava measurement.</div>
+                    </div>
+                </div>
+            </div>
+
+            @* Advanced hemodynamic values.
+               These are nullable because they are only used in selected patients. *@
+            <div class="border rounded p-3 mb-4">
+                <h6 class="mb-3">Advanced Hemodynamics</h6>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">CI</label>
+                        <InputNumber TValue="decimal?"
+                                     class="form-control"
+                                     @bind-Value="Patient.Cardiology.CardiacIndex" />
+                        <div class="form-text">Cardiac index.</div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">CO</label>
+                        <InputNumber TValue="decimal?"
+                                     class="form-control"
+                                     @bind-Value="Patient.Cardiology.CardiacOutput" />
+                        <div class="form-text">Cardiac output.</div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">SVR</label>
+                        <InputNumber TValue="int?"
+                                     class="form-control"
+                                     @bind-Value="Patient.Cardiology.SystemicVascularResistance" />
+                        <div class="form-text">Systemic vascular resistance.</div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">PCWP</label>
+                        <InputNumber TValue="int?"
+                                     class="form-control"
+                                     @bind-Value="Patient.Cardiology.PulmonaryCapillaryWedgePressure" />
+                        <div class="form-text">Pulmonary capillary wedge pressure.</div>
+                    </div>
+                </div>
+            </div>
+
+            @* Free text area for extra cardiology details that do not deserve
+               their own database field yet. *@
+            <div class="border rounded p-3 mb-4">
+                <h6 class="mb-3">Cardiology Notes</h6>
+
+                <InputTextArea class="form-control"
+                               rows="4"
+                               @bind-Value="Patient.Cardiology.Notes" />
+
+                <div class="form-text">
+                    Examples: poor LV function, post PCI, temporary pacemaker, severe MR, echo findings.
+                </div>
+            </div>
+
+            @* This block edits vasopressor and inotrope medication rows. *@
+            <div class="border rounded p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">Support Medications</h6>
+
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            @onclick="() => HandleAddCardiologyMedicationAsync(CardiologyMedicationCategory.Support)"
+                            disabled="@IsSaving">
+                        Add Support Medication
+                    </button>
+                </div>
+
+                @if (GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Support).Any())
+                {
+                    @foreach (var item in GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Support))
+                    {
+                        <div class="border rounded p-3 mb-3">
+                            <div class="row">
+                                <div class="col-md-7 mb-3">
+                                    <label class="form-label">Medication</label>
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="item.MedicationId">
+                                        <option value="0">-- Select Medication --</option>
+
+                                        @foreach (var medication in Medications)
+                                        {
+                                            <option value="@medication.Id">@medication.Name</option>
+                                        }
+                                    </InputSelect>
+
+                                    @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                    {
+                                        <div class="form-text">
+                                            Default frequency: @GetMedicationFrequency(item.MedicationId)
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="col-md-5 mb-3">
+                                    <label class="form-label">Dose</label>
+                                    <InputNumber TValue="decimal?"
+                                                 class="form-control"
+                                                 @bind-Value="item.Dose" />
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button"
+                                        class="btn btn-outline-danger btn-sm"
+                                        @onclick="() => HandleRemoveCardiologyMedicationAsync(item)"
+                                        disabled="@IsSaving">
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-light border mb-0">
+                        No support medications added yet.
+                    </div>
+                }
+            </div>
+
+            @* This block edits other cardiovascular medication rows. *@
+            <div class="border rounded p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">Cardiovascular Medications</h6>
+
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            @onclick="() => HandleAddCardiologyMedicationAsync(CardiologyMedicationCategory.Cardiovascular)"
+                            disabled="@IsSaving">
+                        Add Cardiovascular Medication
+                    </button>
+                </div>
+
+                @if (GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Cardiovascular).Any())
+                {
+                    @foreach (var item in GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Cardiovascular))
+                    {
+                        <div class="border rounded p-3 mb-3">
+                            <div class="row">
+                                <div class="col-md-7 mb-3">
+                                    <label class="form-label">Medication</label>
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="item.MedicationId">
+                                        <option value="0">-- Select Medication --</option>
+
+                                        @foreach (var medication in Medications)
+                                        {
+                                            <option value="@medication.Id">@medication.Name</option>
+                                        }
+                                    </InputSelect>
+
+                                    @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                    {
+                                        <div class="form-text">
+                                            Default frequency: @GetMedicationFrequency(item.MedicationId)
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="col-md-5 mb-3">
+                                    <label class="form-label">Dose</label>
+                                    <InputNumber TValue="decimal?"
+                                                 class="form-control"
+                                                 @bind-Value="item.Dose" />
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button"
+                                        class="btn btn-outline-danger btn-sm"
+                                        @onclick="() => HandleRemoveCardiologyMedicationAsync(item)"
+                                        disabled="@IsSaving">
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-light border mb-0">
+                        No cardiovascular medications added yet.
+                    </div>
+                }
+            </div>
+
+            @* These buttons keep save and reload behavior controlled by the parent page. *@
+            <div class="d-flex gap-2">
+                <button type="submit"
+                        class="btn btn-primary"
+                        disabled="@IsSaving">
+                    @(IsSaving ? "Saving..." : "Save Cardiology Changes")
+                </button>
+
+                <button type="button"
+                        class="btn btn-secondary"
+                        @onclick="HandleReloadAsync"
+                        disabled="@IsSaving">
+                    Reload
+                </button>
+            </div>
+        </EditForm>
+    </div>
+}
+else
+{
+    <div class="alert alert-warning">
+        Cardiology section is not ready for this patient.
+    </div>
+}
+
+@code {
+    // The parent page passes the current patient object into this component.
+    [Parameter, EditorRequired]
+    public Patient? Patient { get; set; }
+
+    // The parent page passes the reusable medication catalog for dropdown lists.
+    [Parameter, EditorRequired]
+    public List<Medication> Medications { get; set; } = new();
+
+    // The parent page passes the EditContext so dirty tracking stays in one place.
+    [Parameter, EditorRequired]
+    public EditContext CardiologyEditContext { get; set; } = default!;
+
+    // This flag tells the component whether to show the unsaved warning for Cardiology.
+    [Parameter]
+    public bool IsCardiologyDirty { get; set; }
+
+    // This flag disables buttons while the parent page is saving data.
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    // The parent page provides the actual save method for the Cardiology section.
+    [Parameter, EditorRequired]
+    public EventCallback OnSaveCardiology { get; set; }
+
+    // The parent page provides the reload method so this component stays UI-focused.
+    [Parameter, EditorRequired]
+    public EventCallback OnReload { get; set; }
+
+    // The parent page provides the method that adds a medication row to the section.
+    [Parameter, EditorRequired]
+    public EventCallback<CardiologyMedicationCategory> OnAddCardiologyMedication { get; set; }
+
+    // The parent page provides the method that removes a medication row from the section.
+    [Parameter, EditorRequired]
+    public EventCallback<CardiologyMedication> OnRemoveCardiologyMedication { get; set; }
+
+    // This callback lets the parent page replace its medication catalog list
+    // after the shared MedicationsManager adds or edits a catalog item.
+    [Parameter]
+    public EventCallback<List<Medication>> OnMedicationsChanged { get; set; }
+
+    // This callback lets the component forward status messages to the parent page.
+    [Parameter]
+    public EventCallback<string> OnStatusMessage { get; set; }
+
+    // This method asks the parent page to save the Cardiology section.
+    private async Task HandleSaveCardiologyAsync()
+    {
+        await OnSaveCardiology.InvokeAsync();
+    }
+
+    // This method asks the parent page to reload the patient data.
+    private async Task HandleReloadAsync()
+    {
+        await OnReload.InvokeAsync();
+    }
+
+    // This method asks the parent page to add a new cardiology medication row.
+    private async Task HandleAddCardiologyMedicationAsync(CardiologyMedicationCategory category)
+    {
+        await OnAddCardiologyMedication.InvokeAsync(category);
+    }
+
+    // This method asks the parent page to remove one cardiology medication row.
+    private async Task HandleRemoveCardiologyMedicationAsync(CardiologyMedication item)
+    {
+        await OnRemoveCardiologyMedication.InvokeAsync(item);
+    }
+
+    // This method receives the refreshed medication catalog from MedicationsManager.
+    // It updates the local list immediately and then informs the parent page too.
+    private async Task HandleMedicationsChangedAsync(List<Medication> refreshedMedications)
+    {
+        Medications = refreshedMedications ?? new List<Medication>();
+        await OnMedicationsChanged.InvokeAsync(Medications);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // This method forwards a success message to the parent page when available.
+    private async Task HandleStatusMessageAsync(string message)
+    {
+        await OnStatusMessage.InvokeAsync(message);
+    }
+
+    // This helper returns the rows for only one medication category at a time.
+    private IEnumerable<CardiologyMedication> GetCardiologyMedicationsByCategory(CardiologyMedicationCategory category)
+    {
+        if (Patient?.Cardiology?.Medications is null)
+            return Enumerable.Empty<CardiologyMedication>();
+
+        return Patient.Cardiology.Medications
+            .Where(x => x.Category == category)
+            .ToList();
+    }
+
+    // This helper looks up the default frequency text for the selected medication.
+    private string? GetMedicationFrequency(int medicationId)
+    {
+        if (medicationId <= 0)
+            return null;
+
+        return Medications
+            .FirstOrDefault(x => x.Id == medicationId)
+            ?.Frequency;
+    }
+}

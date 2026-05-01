@@ -6,7 +6,7 @@ namespace IcuNotes.Services
 {
     public class PatientService
     {
-        // Create a fresh DbContext for each operation
+        // Create a fresh DbContext for each operation.
         private readonly IDbContextFactory<AppDbContext> _dbFactory;
 
         public PatientService(IDbContextFactory<AppDbContext> dbFactory)
@@ -14,14 +14,14 @@ namespace IcuNotes.Services
             _dbFactory = dbFactory;
         }
 
-        // Return all active patients
+        // Return all active patients.
         public async Task<List<Patient>> GetAllAsync()
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
 
             var patients = await context.Patients
                 .AsNoTracking()
-                // Load the related admission unit so pages can display its name safely
+                // Load the related admission unit so pages can display its name safely.
                 .Include(p => p.AdmissionUnitCatalog)
                 .ToListAsync();
 
@@ -32,24 +32,27 @@ namespace IcuNotes.Services
                 .ToList();
         }
 
-        // Return one active patient by Id
+        // Return one active patient by Id.
         public async Task<Patient?> GetByIdAsync(int id)
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
 
             return await context.Patients
                 .AsNoTracking()
-                // Load related data needed by PatientDetails.razor
+                // Load related data needed by PatientDetails.razor.
                 .Include(p => p.AdmissionUnitCatalog)
                 .Include(p => p.PatientSummary)
                 .Include(p => p.PatientDateEvents)
                 .Include(p => p.Neurology)
-                    .ThenInclude(n => n.Medications)
+                    .ThenInclude(n => n!.Medications)
                         .ThenInclude(nm => nm.Medication)
+                .Include(p => p.Cardiology)
+                    .ThenInclude(c => c!.Medications)
+                        .ThenInclude(cm => cm.Medication)
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
 
-        // Add a new active patient
+        // Add a new active patient.
         public async Task AddAsync(Patient patient)
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
@@ -59,8 +62,13 @@ namespace IcuNotes.Services
         }
 
         // Update an existing active patient.
-        // This version updates the patient itself plus the related
-        // PatientSummary, Neurology, and PatientDateEvents.
+        //
+        // This version updates:
+        // - the main Patient fields
+        // - PatientSummary
+        // - Neurology
+        // - Cardiology
+        // - PatientDateEvents
         public async Task UpdateAsync(Patient patient)
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
@@ -71,13 +79,15 @@ namespace IcuNotes.Services
                 .Include(p => p.PatientSummary)
                 .Include(p => p.PatientDateEvents)
                 .Include(p => p.Neurology)
-                    .ThenInclude(n => n.Medications)
+                    .ThenInclude(n => n!.Medications)
+                .Include(p => p.Cardiology)
+                    .ThenInclude(c => c!.Medications)
                 .FirstOrDefaultAsync(p => p.Id == patient.Id);
 
             if (existingPatient is null)
                 return;
 
-            // 1) Update the main Patient fields
+            // 1) Update the main Patient fields.
             existingPatient.Name = patient.Name;
             existingPatient.Age = patient.Age;
             existingPatient.Weight = patient.Weight;
@@ -85,7 +95,7 @@ namespace IcuNotes.Services
             existingPatient.Diagnosis = patient.Diagnosis;
             existingPatient.AdmissionUnitCatalogId = patient.AdmissionUnitCatalogId;
 
-            // 2) Update or create PatientSummary
+            // 2) Update or create PatientSummary.
             if (patient.PatientSummary is null)
             {
                 // If the incoming object has no summary, do nothing here.
@@ -108,7 +118,7 @@ namespace IcuNotes.Services
                 existingPatient.PatientSummary.EventsTodo = patient.PatientSummary.EventsTodo;
             }
 
-            // 3) Update or create Neurology
+            // 3) Update or create Neurology.
             if (patient.Neurology is null)
             {
                 // If the incoming object has no neurology section,
@@ -151,7 +161,7 @@ namespace IcuNotes.Services
                 existingPatient.Neurology.Pupils = patient.Neurology.Pupils;
                 existingPatient.Neurology.MotorStatus = patient.Neurology.MotorStatus;
 
-                // Update NeurologyMedication rows
+                // Update NeurologyMedication rows.
                 var incomingMedications = patient.Neurology.Medications ?? new List<NeurologyMedication>();
 
                 // Collect the real database Ids coming from the page.
@@ -214,13 +224,130 @@ namespace IcuNotes.Services
                 }
             }
 
-            // 4) Update PatientDateEvents
+            // 4) Update or create Cardiology.
+            if (patient.Cardiology is null)
+            {
+                // If the incoming object has no cardiology section,
+                // leave the current database cardiology unchanged.
+            }
+            else if (existingPatient.Cardiology is null)
+            {
+                // Create a new cardiology row if the database does not have one yet.
+                existingPatient.Cardiology = new Cardiology
+                {
+                    PatientId = existingPatient.Id,
+                    HeartRate = patient.Cardiology.HeartRate,
+                    SystolicBloodPressure = patient.Cardiology.SystolicBloodPressure,
+                    DiastolicBloodPressure = patient.Cardiology.DiastolicBloodPressure,
+                    CentralVenousPressure = patient.Cardiology.CentralVenousPressure,
+                    InferiorVenaCava = patient.Cardiology.InferiorVenaCava,
+                    CardiacIndex = patient.Cardiology.CardiacIndex,
+                    CardiacOutput = patient.Cardiology.CardiacOutput,
+                    SystemicVascularResistance = patient.Cardiology.SystemicVascularResistance,
+                    PulmonaryCapillaryWedgePressure = patient.Cardiology.PulmonaryCapillaryWedgePressure,
+                    Notes = patient.Cardiology.Notes
+                };
+
+                // Add the incoming cardiology medications to the new cardiology row.
+                foreach (var incomingMedication in patient.Cardiology.Medications ?? new List<CardiologyMedication>())
+                {
+                    // Ignore incomplete rows where no catalog medication was selected yet.
+                    if (incomingMedication.MedicationId <= 0)
+                        continue;
+
+                    existingPatient.Cardiology.Medications.Add(new CardiologyMedication
+                    {
+                        MedicationId = incomingMedication.MedicationId,
+                        Category = incomingMedication.Category,
+                        Dose = incomingMedication.Dose
+                    });
+                }
+            }
+            else
+            {
+                // Update the existing cardiology scalar fields.
+                existingPatient.Cardiology.HeartRate = patient.Cardiology.HeartRate;
+                existingPatient.Cardiology.SystolicBloodPressure = patient.Cardiology.SystolicBloodPressure;
+                existingPatient.Cardiology.DiastolicBloodPressure = patient.Cardiology.DiastolicBloodPressure;
+                existingPatient.Cardiology.CentralVenousPressure = patient.Cardiology.CentralVenousPressure;
+                existingPatient.Cardiology.InferiorVenaCava = patient.Cardiology.InferiorVenaCava;
+                existingPatient.Cardiology.CardiacIndex = patient.Cardiology.CardiacIndex;
+                existingPatient.Cardiology.CardiacOutput = patient.Cardiology.CardiacOutput;
+                existingPatient.Cardiology.SystemicVascularResistance = patient.Cardiology.SystemicVascularResistance;
+                existingPatient.Cardiology.PulmonaryCapillaryWedgePressure = patient.Cardiology.PulmonaryCapillaryWedgePressure;
+                existingPatient.Cardiology.Notes = patient.Cardiology.Notes;
+
+                // Update CardiologyMedication rows.
+                var incomingMedications = patient.Cardiology.Medications ?? new List<CardiologyMedication>();
+
+                // Collect the real database Ids coming from the page.
+                var incomingExistingMedicationIds = incomingMedications
+                    .Where(m => m.Id > 0)
+                    .Select(m => m.Id)
+                    .ToHashSet();
+
+                // Remove database rows that no longer exist in the incoming list.
+                var medicationsToRemove = existingPatient.Cardiology.Medications
+                    .Where(dbMedication => !incomingExistingMedicationIds.Contains(dbMedication.Id))
+                    .ToList();
+
+                foreach (var dbMedication in medicationsToRemove)
+                {
+                    context.Remove(dbMedication);
+                }
+
+                // Add new rows and update existing rows.
+                foreach (var incomingMedication in incomingMedications)
+                {
+                    // Ignore incomplete rows where no catalog medication was selected yet.
+                    if (incomingMedication.MedicationId <= 0)
+                        continue;
+
+                    if (incomingMedication.Id == 0)
+                    {
+                        // This is a new cardiology medication row created on the page.
+                        existingPatient.Cardiology.Medications.Add(new CardiologyMedication
+                        {
+                            MedicationId = incomingMedication.MedicationId,
+                            Category = incomingMedication.Category,
+                            Dose = incomingMedication.Dose
+                        });
+                    }
+                    else
+                    {
+                        // This is an existing cardiology medication row.
+                        var existingMedication = existingPatient.Cardiology.Medications
+                            .FirstOrDefault(m => m.Id == incomingMedication.Id);
+
+                        if (existingMedication is null)
+                        {
+                            // Safety fallback:
+                            // if for some reason it was not loaded, add it as a new row.
+                            existingPatient.Cardiology.Medications.Add(new CardiologyMedication
+                            {
+                                MedicationId = incomingMedication.MedicationId,
+                                Category = incomingMedication.Category,
+                                Dose = incomingMedication.Dose
+                            });
+                        }
+                        else
+                        {
+                            existingMedication.MedicationId = incomingMedication.MedicationId;
+                            existingMedication.Category = incomingMedication.Category;
+                            existingMedication.Dose = incomingMedication.Dose;
+                        }
+                    }
+                }
+            }
+
+            // 5) Update PatientDateEvents.
+            //
             // We compare the incoming events from the page with the events
             // already stored in the database.
             var incomingEvents = patient.PatientDateEvents ?? new List<PatientDateEvent>();
 
             // Remove database events that are no longer present in the incoming list.
-            // We only compare events that already have a real Id (> 0).
+            // We only compare events that already have a real Id greater than 0.
             var incomingExistingIds = incomingEvents
                 .Where(e => e.Id > 0)
                 .Select(e => e.Id)
@@ -276,7 +403,7 @@ namespace IcuNotes.Services
             await context.SaveChangesAsync();
         }
 
-        // Return all admission units for the dropdown list
+        // Return all admission units for the dropdown list.
         public async Task<List<AdmissionUnitCatalog>> GetAdmissionUnitsAsync()
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
@@ -365,7 +492,7 @@ namespace IcuNotes.Services
             await context.SaveChangesAsync();
         }
 
-        // Return all reusable medications for dropdown lists
+        // Return all reusable medications for dropdown lists.
         public async Task<List<Medication>> GetMedicationsAsync()
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
@@ -497,10 +624,12 @@ namespace IcuNotes.Services
         }
 
         // Move a patient from the active table to the archive table.
+        //
         // This version also copies:
         // - CombinedHistory from PatientSummary
         // - all PatientDateEvents into ArchivedPatientDateEvents
-        // Neurology is intentionally not copied yet.
+        //
+        // Neurology and Cardiology are intentionally not copied yet.
         public async Task ArchiveAsync(int id)
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
@@ -538,7 +667,7 @@ namespace IcuNotes.Services
             await context.SaveChangesAsync();
         }
 
-        // Return all archived patients
+        // Return all archived patients.
         public async Task<List<ArchivedPatient>> GetArchivedAsync()
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
@@ -549,12 +678,12 @@ namespace IcuNotes.Services
                 .ToListAsync();
         }
 
-        // Restore an archived patient back to the active patients table
+        // Restore an archived patient back to the active patients table.
         public async Task RestorePatientAsync(int archivedPatientId)
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
 
-            // Find the archived patient first
+            // Find the archived patient first.
             var archivedPatient = await context.ArchivedPatients
                 .FirstOrDefaultAsync(x => x.Id == archivedPatientId);
 
@@ -576,13 +705,13 @@ namespace IcuNotes.Services
 
             context.Patients.Add(patient);
 
-            // Remove it from archive after recreating it as an active patient
+            // Remove it from archive after recreating it as an active patient.
             context.ArchivedPatients.Remove(archivedPatient);
 
             await context.SaveChangesAsync();
         }
 
-        // Delete a patient permanently from the archived patients table
+        // Delete a patient permanently from the archived patients table.
         public async Task DeleteArchivedAsync(int archivedPatientId)
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
