@@ -2,21 +2,26 @@
 @using Microsoft.AspNetCore.Components.Forms
 @inject IcuNotes.Services.PatientService PatientService
 
-@* This component manages the shared Admission Unit catalog UI.
-   It can be reused anywhere you need to add or edit catalog items
-   without duplicating the same buttons and modals again. *@
+@* This component manages the shared Admission Unit catalog only.
+
+   Important design rule:
+   - This component adds and edits AdmissionUnitCatalog rows.
+   - It does NOT decide which admission unit belongs to the current patient.
+   - The current patient's selected admission unit is Overview data,
+     so that must stay inside OverviewSection. *@
+
 <div class="d-flex gap-2 mb-3">
     <button type="button"
             class="btn btn-outline-secondary"
             @onclick="OpenAddAdmissionUnitModal"
-            disabled="@IsSaving">
+            disabled="@IsBusy">
         Add New Admission Unit
     </button>
 
     <button type="button"
             class="btn btn-outline-secondary"
             @onclick="OpenEditAdmissionUnitModal"
-            disabled="@IsSaving">
+            disabled="@IsBusy">
         Edit Admission Unit
     </button>
 </div>
@@ -33,7 +38,7 @@
                     <button type="button"
                             class="btn-close"
                             @onclick="CloseAddAdmissionUnitModal"
-                            disabled="@IsSaving">
+                            disabled="@IsBusy">
                     </button>
                 </div>
 
@@ -56,15 +61,15 @@
                     <button type="button"
                             class="btn btn-secondary"
                             @onclick="CloseAddAdmissionUnitModal"
-                            disabled="@IsSaving">
+                            disabled="@IsBusy">
                         Cancel
                     </button>
 
                     <button type="button"
                             class="btn btn-primary"
                             @onclick="SaveNewAdmissionUnitAsync"
-                            disabled="@IsSaving">
-                        @(IsSaving ? "Saving..." : "Save Admission Unit")
+                            disabled="@IsBusy">
+                        @(IsBusy ? "Saving..." : "Save Admission Unit")
                     </button>
                 </div>
             </div>
@@ -84,7 +89,7 @@
                     <button type="button"
                             class="btn-close"
                             @onclick="CloseEditAdmissionUnitModal"
-                            disabled="@IsSaving">
+                            disabled="@IsBusy">
                     </button>
                 </div>
 
@@ -128,15 +133,15 @@
                     <button type="button"
                             class="btn btn-secondary"
                             @onclick="CloseEditAdmissionUnitModal"
-                            disabled="@IsSaving">
+                            disabled="@IsBusy">
                         Cancel
                     </button>
 
                     <button type="button"
                             class="btn btn-primary"
                             @onclick="SaveEditedAdmissionUnitAsync"
-                            disabled="@IsSaving">
-                        @(IsSaving ? "Saving..." : "Save Changes")
+                            disabled="@IsBusy">
+                        @(IsBusy ? "Saving..." : "Save Changes")
                     </button>
                 </div>
             </div>
@@ -145,24 +150,41 @@
 }
 
 @code {
-    // This is the current patient being edited.
-    // The component can auto-select a new Admission Unit for this patient.
-    [Parameter, EditorRequired]
-    public Patient Patient { get; set; } = default!;
-
-    // This shared catalog fills the Admission Unit dropdown and edit modal.
-    // We keep the same list instance so parent and child stay synchronized.
+    // This shared catalog fills the Admission Unit dropdown in Overview
+    // and the Edit Admission Unit modal here.
     [Parameter, EditorRequired]
     public List<AdmissionUnitCatalog> AdmissionUnits { get; set; } = new();
 
-    // This EditContext belongs to the Overview section.
-    // We notify it when the selected Admission Unit changes so dirty tracking still works.
-    [Parameter, EditorRequired]
-    public EditContext OverviewEditContext { get; set; } = default!;
+    // This follows the same idea as MedicationsManager:
+    // the parent can disable this manager while another save operation is happening.
+    [Parameter]
+    public bool IsDisabled { get; set; }
 
-    // This flag lets the parent disable the manager while a save operation is running.
+    // Temporary compatibility with the old OverviewSection parameter name.
+    // Later we can remove IsSaving and use only IsDisabled, like MedicationsManager.
     [Parameter]
     public bool IsSaving { get; set; }
+
+    // This callback lets the parent know that the catalog list has changed.
+    // In the next step, OverviewSection can use this to refresh its dropdown cleanly.
+    [Parameter]
+    public EventCallback<List<AdmissionUnitCatalog>> OnAdmissionUnitsChanged { get; set; }
+
+    // Optional callback for showing a success message in the parent page.
+    [Parameter]
+    public EventCallback<string> OnStatusMessage { get; set; }
+
+    // These old parameters are kept only so the current OverviewSection does not break.
+    // They are intentionally NOT used anymore.
+    // This is what separates the catalog manager from the patient overview.
+    [Parameter]
+    public Patient? Patient { get; set; }
+
+    [Parameter]
+    public EditContext? OverviewEditContext { get; set; }
+
+    [Parameter]
+    public EventCallback OnSaveAdmissionUnitSelection { get; set; }
 
     // This local state controls the Add Admission Unit modal.
     private bool showAddAdmissionUnitModal;
@@ -175,9 +197,16 @@
     private string editAdmissionUnitName = string.Empty;
     private string? editAdmissionUnitErrorMessage;
 
+    // This local flag prevents double-clicking the modal save buttons.
+    private bool isWorking;
+
+    // This combined flag is used by buttons and modal actions.
+    private bool IsBusy => IsDisabled || IsSaving || isWorking;
+
     // This method opens the Add modal in a clean empty state.
     private void OpenAddAdmissionUnitModal()
     {
+        showEditAdmissionUnitModal = false;
         newAdmissionUnitName = string.Empty;
         newAdmissionUnitErrorMessage = null;
         showAddAdmissionUnitModal = true;
@@ -190,15 +219,21 @@
         newAdmissionUnitErrorMessage = null;
     }
 
-    // This method opens the Edit modal and preloads the current selected unit when possible.
+    // This method opens the Edit modal and preloads the first available unit.
+    // Notice that it no longer uses Patient.AdmissionUnitCatalogId.
+    // The selected patient admission unit belongs to Overview, not to this manager.
     private void OpenEditAdmissionUnitModal()
     {
+        showAddAdmissionUnitModal = false;
         editAdmissionUnitErrorMessage = null;
         showEditAdmissionUnitModal = true;
 
         if (AdmissionUnits.Any())
         {
-            var unitIdToLoad = Patient.AdmissionUnitCatalogId ?? AdmissionUnits.First().Id;
+            var unitIdToLoad = selectedAdmissionUnitToEditId > 0
+                ? selectedAdmissionUnitToEditId
+                : AdmissionUnits.First().Id;
+
             LoadAdmissionUnitForEdit(unitIdToLoad);
         }
         else
@@ -246,44 +281,51 @@
         editAdmissionUnitName = selectedAdmissionUnit.Name;
     }
 
-    // This method saves a new shared Admission Unit and auto-selects it for the current patient.
+    // This method saves a new shared Admission Unit catalog row.
+    // It does NOT auto-select the new unit for the current patient.
+    // Therefore, it does NOT mark Overview as dirty.
     private async Task SaveNewAdmissionUnitAsync()
     {
         try
         {
+            newAdmissionUnitErrorMessage = null;
+
             if (string.IsNullOrWhiteSpace(newAdmissionUnitName))
             {
                 newAdmissionUnitErrorMessage = "Admission unit name is required.";
                 return;
             }
 
-            var savedAdmissionUnit = await PatientService.AddAdmissionUnitIfMissingAsync(new AdmissionUnitCatalog
+            isWorking = true;
+
+            await PatientService.AddAdmissionUnitIfMissingAsync(new AdmissionUnitCatalog
             {
                 Name = newAdmissionUnitName.Trim()
             });
 
-            // Refresh the shared list in-place so the parent and all components keep the same data instance.
-            var refreshedAdmissionUnits = await PatientService.GetAdmissionUnitsAsync();
-            AdmissionUnits.Clear();
-            AdmissionUnits.AddRange(refreshedAdmissionUnits);
-
-            // Auto-select the new catalog item for the current patient.
-            Patient.AdmissionUnitCatalogId = savedAdmissionUnit.Id;
-
-            // Notify the Overview EditContext so your existing dirty tracking still works.
-            OverviewEditContext.NotifyFieldChanged(FieldIdentifier.Create(() => Patient.AdmissionUnitCatalogId));
+            await RefreshAdmissionUnitsAsync();
 
             showAddAdmissionUnitModal = false;
             newAdmissionUnitName = string.Empty;
             newAdmissionUnitErrorMessage = null;
+
+            if (OnStatusMessage.HasDelegate)
+            {
+                await OnStatusMessage.InvokeAsync("Admission unit saved to catalog.");
+            }
         }
         catch (Exception ex)
         {
             newAdmissionUnitErrorMessage = ex.Message;
         }
+        finally
+        {
+            isWorking = false;
+        }
     }
 
     // This method saves edits to an existing shared Admission Unit catalog row.
+    // This is also catalog-only. It does not change the current patient.
     private async Task SaveEditedAdmissionUnitAsync()
     {
         try
@@ -302,26 +344,50 @@
                 return;
             }
 
+            isWorking = true;
+
             await PatientService.UpdateAdmissionUnitAsync(new AdmissionUnitCatalog
             {
                 Id = selectedAdmissionUnitToEditId,
                 Name = editAdmissionUnitName.Trim()
             });
 
-            // Refresh the shared list in-place so all parts of the page see the updated names.
-            var refreshedAdmissionUnits = await PatientService.GetAdmissionUnitsAsync();
-            AdmissionUnits.Clear();
-            AdmissionUnits.AddRange(refreshedAdmissionUnits);
+            await RefreshAdmissionUnitsAsync();
 
-            // Reload the selected row from the refreshed list so the modal shows the saved value.
+            // Reload the selected row from the refreshed list so the modal has the saved value.
             LoadAdmissionUnitForEdit(selectedAdmissionUnitToEditId);
 
             showEditAdmissionUnitModal = false;
             editAdmissionUnitErrorMessage = null;
+
+            if (OnStatusMessage.HasDelegate)
+            {
+                await OnStatusMessage.InvokeAsync("Admission unit updated in catalog.");
+            }
         }
         catch (Exception ex)
         {
             editAdmissionUnitErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isWorking = false;
+        }
+    }
+
+    // This helper refreshes the catalog list after add/edit.
+    // We update the existing list in-place so any component using the same list object
+    // can see the refreshed data.
+    private async Task RefreshAdmissionUnitsAsync()
+    {
+        var refreshedAdmissionUnits = await PatientService.GetAdmissionUnitsAsync();
+
+        AdmissionUnits.Clear();
+        AdmissionUnits.AddRange(refreshedAdmissionUnits);
+
+        if (OnAdmissionUnitsChanged.HasDelegate)
+        {
+            await OnAdmissionUnitsChanged.InvokeAsync(refreshedAdmissionUnits);
         }
     }
 }

@@ -2,19 +2,80 @@
 
 <div class="page">
     <header class="top-bar">
+        <!--
+            The hamburger button opens the left sliding menu.
+            We use a normal Blazor @onclick event, so no JavaScript is needed.
+        -->
+        <button class="hamburger-button"
+                type="button"
+                @onclick="OpenMenu"
+                aria-label="Open navigation menu">
+            ☰
+        </button>
+
         <div class="top-bar-title">ICU Notes</div>
 
-        <nav class="top-bar-links">
-            <a href="/">Home</a>
-            <a href="/patients">Active Patients</a>
-            <a href="/archived-patients">Archived Patients</a>
-        </nav>
+        <!--
+            The top bar links were removed from here.
+            Navigation now lives inside the sliding side menu below.
+        -->
     </header>
+
+    @if (isMenuOpen)
+    {
+        <!--
+            The backdrop covers the screen behind the menu.
+            Clicking it closes the menu.
+        -->
+        <div class="menu-backdrop" @onclick="CloseMenu"></div>
+    }
+
+    <!--
+        Left sliding menu.
+        The CSS class changes depending on isMenuOpen.
+    -->
+    <aside class="side-menu @(isMenuOpen ? "side-menu-open" : "")">
+        <div class="side-menu-header">
+            <div class="side-menu-title">Menu</div>
+
+            <button class="close-menu-button"
+                    type="button"
+                    @onclick="CloseMenu"
+                    aria-label="Close navigation menu">
+                X
+            </button>
+        </div>
+
+        <nav class="side-menu-links">
+            <!--
+                Each link closes the menu after navigation.
+                href keeps navigation simple and reliable in a MAUI-Blazor Hybrid app.
+            -->
+            <a href="/" @onclick="CloseMenu">Home</a>
+            <a href="/patients" @onclick="CloseMenu">Active Patients</a>
+            <a href="/archived-patients" @onclick="CloseMenu">Archived Patients</a>
+        </nav>
+    </aside>
 
     <main class="main-content">
         @Body
     </main>
 </div>
+
+@code {
+    // Tracks whether the left sliding menu is currently visible.
+    private bool isMenuOpen = false;
+
+    private void OpenMenu()
+    {
+        isMenuOpen = true;
+    }
+
+    private void CloseMenu()
+    {
+        isMenuOpen = false;
+    }
+}
 
 <style>
     .page {
@@ -26,36 +87,148 @@
 
     .top-bar {
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        padding: 12px 20px;
+        gap: 12px;
+        /*
+                Normal top-bar padding for desktop.
+                env(safe-area-inset-top) helps on devices that report a safe area.
+            */
+        padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 12px 20px;
         background-color: #1f2937;
         color: white;
         border-bottom: 1px solid #374151;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
     }
+
+    .hamburger-button {
+        width: 40px;
+        height: 40px;
+        border: none;
+        border-radius: 8px;
+        background-color: transparent;
+        color: white;
+        font-size: 1.6rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+        .hamburger-button:hover {
+            background-color: #374151;
+        }
 
     .top-bar-title {
         font-size: 1.2rem;
         font-weight: bold;
     }
 
-    .top-bar-links {
-        display: flex;
-        gap: 16px;
-    }
-
-    .top-bar-links a {
-        color: white;
-        text-decoration: none;
-        font-weight: 500;
-    }
-
-    .top-bar-links a:hover {
-        text-decoration: underline;
-    }
-
     .main-content {
         flex: 1;
         padding: 20px;
+    }
+
+    .menu-backdrop {
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.35);
+        z-index: 1100;
+    }
+
+    .side-menu {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 280px;
+        max-width: 85vw;
+        /*
+                100dvh behaves better than 100vh on mobile browsers/WebViews
+                because it follows the dynamic visible viewport height.
+            */
+        height: 100dvh;
+        background-color: white;
+        box-shadow: 4px 0 16px rgba(0, 0, 0, 0.18);
+        transform: translateX(-100%);
+        transition: transform 0.2s ease-in-out;
+        z-index: 1200;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .side-menu-open {
+        transform: translateX(0);
+    }
+
+    .side-menu-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        /*
+                Same safe-area idea as the top bar, so the menu header
+                does not sit underneath the Android status bar.
+            */
+        padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 16px 18px;
+        background-color: #1f2937;
+        color: white;
+    }
+
+    .side-menu-title {
+        font-size: 1.1rem;
+        font-weight: bold;
+    }
+
+    .close-menu-button {
+        width: 36px;
+        height: 36px;
+        border: none;
+        border-radius: 8px;
+        background-color: transparent;
+        color: white;
+        font-size: 1.8rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+        .close-menu-button:hover {
+            background-color: #374151;
+        }
+
+    .side-menu-links {
+        display: flex;
+        flex-direction: column;
+        padding: 12px;
+        gap: 6px;
+    }
+
+        .side-menu-links a {
+            display: block;
+            padding: 12px 14px;
+            border-radius: 10px;
+            color: #111827;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+            .side-menu-links a:hover {
+                background-color: #f3f4f6;
+            }
+
+    /*
+            Some Android WebViews do not always provide a useful safe-area value.
+            This small-screen fallback adds extra breathing room at the top only on
+            phone-sized screens, where the status-bar overlap was seen.
+        */
+    @@media (max-width: 768px) {
+        .top-bar {
+            padding-top: calc(12px + max(env(safe-area-inset-top, 0px), 24px));
+        }
+
+        .side-menu-header {
+            padding-top: calc(16px + max(env(safe-area-inset-top, 0px), 24px));
+        }
+
+        .main-content {
+            padding: 16px;
+        }
     }
 </style>

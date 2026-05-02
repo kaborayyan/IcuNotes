@@ -3,26 +3,34 @@
 @using Microsoft.AspNetCore.Components.Forms
 
 @* This component contains the Overview section UI.
-   In your new design, Timeline is shown inside the Overview section too. *@
+   Timeline is shown inside the Overview section too. *@
 @if (Patient is not null)
 {
-    @* This block shows the normal overview fields and keeps its own save button. *@
     <div>
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="mb-3">
             <h5 class="mb-0">Overview</h5>
-
-            @if (IsOverviewDirty)
-            {
-                <span class="text-warning fw-semibold">You have unsaved overview changes.</span>
-            }
-            else
-            {
-                <span class="text-muted">Overview is saved.</span>
-            }
         </div>
 
-        @* This form edits the main overview fields such as name, bed, diagnosis, and admission unit. *@
-        <EditForm EditContext="OverviewEditContext" OnValidSubmit="HandleSaveOverviewAsync">
+        @if (!string.IsNullOrWhiteSpace(admissionUnitStatusMessage))
+        {
+            <div class="alert alert-success py-2">
+                @admissionUnitStatusMessage
+            </div>
+        }
+
+        @* This form should contain ONLY fields that belong to the current Patient overview.
+
+           Important:
+           AdmissionUnitsManager is intentionally NOT inside this EditForm anymore.
+
+           Why?
+           If AdmissionUnitsManager is inside this EditForm, its modal InputText controls receive
+           the OverviewEditContext automatically from Blazor. Then typing inside the modal marks
+           Overview as dirty even though the patient was not changed.
+
+           By keeping AdmissionUnitsManager outside the EditForm, catalog editing is separated
+           from patient overview editing. *@
+        <EditForm EditContext="OverviewEditContext">
             <DataAnnotationsValidator />
             <ValidationSummary />
 
@@ -83,47 +91,33 @@
                         <option value="@unit.Id">@unit.Name</option>
                     }
                 </InputSelect>
+
+                <div class="form-text">
+                    Selecting a unit here changes the current patient and will be saved from the bottom bar.
+                </div>
             </div>
 
-            @* This reusable manager handles the shared Admission Unit catalog UI.
-               It keeps the add/edit buttons and modals outside this section so other sections
-               can reuse the same catalog manager later too. *@
-            <AdmissionUnitsManager Patient="Patient"
-                                   AdmissionUnits="AdmissionUnits"
-                                   OverviewEditContext="OverviewEditContext"
-                                   IsSaving="IsSaving" />
-
-            <div class="d-flex gap-2">
-                <button type="submit"
-                        class="btn btn-primary"
-                        disabled="@IsSaving">
-                    @(IsSaving ? "Saving..." : "Save Overview Changes")
-                </button>
-
-                <button type="button"
-                        class="btn btn-secondary"
-                        @onclick="HandleReloadAsync"
-                        disabled="@IsSaving">
-                    Reload
-                </button>
-            </div>
         </EditForm>
+
+        @* This reusable manager handles the shared Admission Unit catalog only.
+
+           It is outside the Overview EditForm on purpose.
+
+           Clean separation:
+           - This manager adds/edits catalog rows.
+           - The dropdown above selects the admission unit for this patient.
+           - The bottom Save button saves the patient's selected admission unit. *@
+        <AdmissionUnitsManager AdmissionUnits="AdmissionUnits"
+                               IsDisabled="IsSaving"
+                               OnAdmissionUnitsChanged="HandleAdmissionUnitsChangedAsync"
+                               OnStatusMessage="HandleAdmissionUnitStatusMessageAsync" />
 
         <hr class="my-4" />
 
-        @* This block shows the Timeline editor, but now as part of Overview instead of its own tab. *@
+        @* Timeline is part of Overview, but it has its own EditContext for dirty tracking. *@
         <div>
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="mb-3">
                 <h5 class="mb-0">Timeline</h5>
-
-                @if (IsTimelineDirty)
-                {
-                    <span class="text-warning fw-semibold">You have unsaved timeline changes.</span>
-                }
-                else
-                {
-                    <span class="text-muted">Timeline is saved.</span>
-                }
             </div>
 
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -139,8 +133,7 @@
 
             @if (OrderedDateEvents.Any())
             {
-                @* This form edits the list of timeline events using its own separate save button. *@
-                <EditForm EditContext="TimelineEditContext" OnValidSubmit="HandleSaveTimelineAsync">
+                <EditForm EditContext="TimelineEditContext">
                     <DataAnnotationsValidator />
                     <ValidationSummary />
 
@@ -171,37 +164,14 @@
                         </div>
                     }
 
-                    <div class="d-flex gap-2">
-                        <button type="submit"
-                                class="btn btn-primary"
-                                disabled="@IsSaving">
-                            @(IsSaving ? "Saving..." : "Save Timeline Changes")
-                        </button>
-
-                        <button type="button"
-                                class="btn btn-secondary"
-                                @onclick="HandleReloadAsync"
-                                disabled="@IsSaving">
-                            Reload
-                        </button>
-                    </div>
                 </EditForm>
             }
             else
             {
-                @* Show a friendly empty state before any timeline events are added. *@
                 <div class="alert alert-light border">
                     No timeline events added yet.
                 </div>
 
-                <div class="d-flex gap-2">
-                    <button type="button"
-                            class="btn btn-secondary"
-                            @onclick="HandleReloadAsync"
-                            disabled="@IsSaving">
-                        Reload
-                    </button>
-                </div>
             }
         </div>
     </div>
@@ -212,7 +182,7 @@
     [Parameter, EditorRequired]
     public Patient Patient { get; set; } = default!;
 
-    // This shared catalog fills the Admission Unit dropdown and edit modal.
+    // This shared catalog fills the Admission Unit dropdown and the AdmissionUnitsManager modals.
     [Parameter, EditorRequired]
     public List<AdmissionUnitCatalog> AdmissionUnits { get; set; } = new();
 
@@ -220,54 +190,62 @@
     [Parameter, EditorRequired]
     public List<PatientDateEvent> OrderedDateEvents { get; set; } = new();
 
-    // This EditContext is created by the parent page and tracks Overview field changes.
+    // This EditContext is created by PatientDetails.razor.
+    // It tracks changes in the patient overview fields.
     [Parameter, EditorRequired]
     public EditContext OverviewEditContext { get; set; } = default!;
 
-    // This EditContext is created by the parent page and tracks Timeline field changes.
+    // This EditContext is created by PatientDetails.razor.
+    // It tracks changes in the timeline fields.
     [Parameter, EditorRequired]
     public EditContext TimelineEditContext { get; set; } = default!;
 
-    // These flags control the unsaved badges and save button states.
-    [Parameter] public bool IsOverviewDirty { get; set; }
-    [Parameter] public bool IsTimelineDirty { get; set; }
-    [Parameter] public bool IsSaving { get; set; }
+    // PatientDetails.razor passes this value while saving/reloading.
+    // We use it here only to disable buttons that should not be clicked during saving.
+    [Parameter]
+    public bool IsSaving { get; set; }
 
-    // These callbacks let the parent page stay in charge of saving and reloading.
-    [Parameter, EditorRequired] public EventCallback OnSaveOverview { get; set; }
-    [Parameter, EditorRequired] public EventCallback OnSaveTimeline { get; set; }
-    [Parameter, EditorRequired] public EventCallback OnReload { get; set; }
-    [Parameter, EditorRequired] public EventCallback OnAddTimelineEvent { get; set; }
-    [Parameter, EditorRequired] public EventCallback<PatientDateEvent> OnRemoveTimelineEvent { get; set; }
+    // The parent page still owns timeline row creation.
+    // This component only displays the button and forwards the click.
+    [Parameter, EditorRequired]
+    public EventCallback OnAddTimelineEvent { get; set; }
 
-    // This small method forwards the Overview save request to the parent page.
-    private Task HandleSaveOverviewAsync()
-    {
-        return OnSaveOverview.InvokeAsync();
-    }
+    // The parent page still owns timeline row removal.
+    // This component only forwards the selected row to the parent.
+    [Parameter, EditorRequired]
+    public EventCallback<PatientDateEvent> OnRemoveTimelineEvent { get; set; }
 
-    // This small method forwards the Timeline save request to the parent page.
-    private Task HandleSaveTimelineAsync()
-    {
-        return OnSaveTimeline.InvokeAsync();
-    }
+    // This message is used only for admission-unit catalog actions.
+    // It does not mean the patient overview was changed or saved.
+    private string? admissionUnitStatusMessage;
 
-    // This small method forwards the reload request to the parent page.
-    private Task HandleReloadAsync()
-    {
-        return OnReload.InvokeAsync();
-    }
-
-    // This small method forwards the add-timeline-row request to the parent page.
+    // This forwards the add-timeline-row request to PatientDetails.razor.
     private Task HandleAddTimelineEventAsync()
     {
         return OnAddTimelineEvent.InvokeAsync();
     }
 
-    // This small method forwards the remove-timeline-row request to the parent page.
+    // This forwards the remove-timeline-row request to PatientDetails.razor.
     private Task HandleRemoveTimelineEventAsync(PatientDateEvent item)
     {
         return OnRemoveTimelineEvent.InvokeAsync(item);
     }
 
+    // This receives the refreshed catalog list from AdmissionUnitsManager.
+    // The patient is not changed here.
+    private Task HandleAdmissionUnitsChangedAsync(List<AdmissionUnitCatalog> refreshedAdmissionUnits)
+    {
+        AdmissionUnits.Clear();
+        AdmissionUnits.AddRange(refreshedAdmissionUnits);
+
+        return Task.CompletedTask;
+    }
+
+    // This receives success messages from AdmissionUnitsManager.
+    // Example: "Admission unit saved to catalog."
+    private Task HandleAdmissionUnitStatusMessageAsync(string message)
+    {
+        admissionUnitStatusMessage = message;
+        return Task.CompletedTask;
+    }
 }

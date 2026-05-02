@@ -9,13 +9,8 @@
 
 <h3 class="mb-4">Patient Details</h3>
 
-@if (!string.IsNullOrWhiteSpace(statusMessage))
-{
-    <div class="alert @statusCssClass">
-        @statusMessage
-    </div>
-}
-
+@* Save/reload feedback is now shown in the fixed bottom bar,
+   so the top of the page stays clean. *@
 @if (isLoading)
 {
     <p>Loading patient details...</p>
@@ -126,12 +121,7 @@ else
                                  OrderedDateEvents="orderedDateEvents"
                                  OverviewEditContext="overviewEditContext!"
                                  TimelineEditContext="timelineEditContext!"
-                                 IsOverviewDirty="isOverviewDirty"
-                                 IsTimelineDirty="isTimelineDirty"
                                  IsSaving="isSaving"
-                                 OnSaveOverview="SaveOverviewAsync"
-                                 OnSaveTimeline="SaveTimelineAsync"
-                                 OnReload="ReloadPatientAsync"
                                  OnAddTimelineEvent="AddTimelineEventCallbackAsync"
                                  OnRemoveTimelineEvent="RemoveTimelineEventCallbackAsync" />
             }
@@ -140,11 +130,7 @@ else
             else if (activeTab == "summary")
             {
                 <SummarySection Patient="patient"
-                                SummaryEditContext="summaryEditContext!"
-                                IsSummaryDirty="isSummaryDirty"
-                                IsSaving="isSaving"
-                                OnSaveSummary="SaveSummaryAsync"
-                                OnReload="ReloadPatientAsync" />
+                                SummaryEditContext="summaryEditContext!" />
             }
             @* Render Neurology through its own child component.
                The parent page still owns save logic and dirty tracking. *@
@@ -153,10 +139,7 @@ else
                 <NeurologySection Patient="patient"
                                   Medications="medications"
                                   NeurologyEditContext="neurologyEditContext!"
-                                  IsNeurologyDirty="isNeurologyDirty"
                                   IsSaving="isSaving"
-                                  OnSaveNeurology="SaveNeurologyAsync"
-                                  OnReload="ReloadPatientAsync"
                                   OnAddNeurologyMedication="AddNeurologyMedication"
                                   OnRemoveNeurologyMedication="RemoveNeurologyMedication"
                                   OnMedicationsChanged="HandleMedicationsChangedAsync"
@@ -170,10 +153,7 @@ else
                 <CardiologySection Patient="patient"
                                    Medications="medications"
                                    CardiologyEditContext="cardiologyEditContext!"
-                                   IsCardiologyDirty="isCardiologyDirty"
                                    IsSaving="isSaving"
-                                   OnSaveCardiology="SaveCardiologyAsync"
-                                   OnReload="ReloadPatientAsync"
                                    OnAddCardiologyMedication="AddCardiologyMedication"
                                    OnRemoveCardiologyMedication="RemoveCardiologyMedication"
                                    OnMedicationsChanged="HandleMedicationsChangedAsync"
@@ -187,7 +167,69 @@ else
             </div>
         </div>
     </div>
+
+    @* This spacer prevents the fixed bottom bar from covering the bottom of the page content. *@
+    <div class="patient-details-bottom-spacer"></div>
+
+    @* Fixed bottom action bar.
+       For now, the old save/reload buttons inside each section remain in place.
+       This makes the new bar safe to test without removing working UI. *@
+    <div class="fixed-bottom patient-details-action-bar bg-white border-top shadow-sm">
+        <div class="container-fluid">
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2">
+                <div>
+
+                    <div class="@GetActiveSectionStatusCssClass()">
+                        @GetActiveSectionStatusText()
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="button"
+                            class="btn btn-outline-secondary flex-fill flex-sm-grow-0"
+                            disabled="@isSaving"
+                            @onclick="ReloadPatientAsync">
+                        Reload
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-primary flex-fill flex-sm-grow-0"
+                            disabled="@(isSaving || !IsActiveSectionDirty())"
+                            @onclick="SaveActiveSectionAsync">
+                        @if (isSaving)
+                        {
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Save @GetActiveSectionName()</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 }
+
+<style>
+    /* The fixed action bar sits at the bottom of the screen.
+               It uses mostly Bootstrap classes in the markup.
+               These small CSS rules only handle spacing and mobile safety. */
+    .patient-details-action-bar {
+        z-index: 1030;
+        padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+    }
+
+    .patient-details-bottom-spacer {
+        height: 95px;
+    }
+
+    @@media (max-width: 575.98px) {
+        .patient-details-bottom-spacer {
+            height: 130px;
+        }
+    }
+</style>
 
 @code {
     [Parameter]
@@ -364,12 +406,12 @@ else
 
             isOverviewDirty = false;
 
-            statusMessage = "Overview changes saved successfully.";
+            statusMessage = "Overview saved successfully.";
             statusCssClass = "alert-success";
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error while saving overview changes: {ex.Message}";
+            statusMessage = $"Error while saving Overview: {ex.Message}";
             statusCssClass = "alert-danger";
         }
         finally
@@ -391,12 +433,12 @@ else
 
             isSummaryDirty = false;
 
-            statusMessage = "Summary changes saved successfully.";
+            statusMessage = "Summary saved successfully.";
             statusCssClass = "alert-success";
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error while saving summary changes: {ex.Message}";
+            statusMessage = $"Error while saving Summary: {ex.Message}";
             statusCssClass = "alert-danger";
         }
         finally
@@ -431,12 +473,12 @@ else
 
             isTimelineDirty = false;
 
-            statusMessage = "Timeline changes saved successfully.";
+            statusMessage = "Timeline saved successfully.";
             statusCssClass = "alert-success";
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error while saving timeline changes: {ex.Message}";
+            statusMessage = $"Error while saving Timeline: {ex.Message}";
             statusCssClass = "alert-danger";
         }
         finally
@@ -477,12 +519,12 @@ else
 
             isNeurologyDirty = false;
 
-            statusMessage = "Neurology changes saved successfully.";
+            statusMessage = "Neurology saved successfully.";
             statusCssClass = "alert-success";
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error while saving neurology changes: {ex.Message}";
+            statusMessage = $"Error while saving Neurology: {ex.Message}";
             statusCssClass = "alert-danger";
         }
         finally
@@ -523,12 +565,12 @@ else
 
             isCardiologyDirty = false;
 
-            statusMessage = "Cardiology changes saved successfully.";
+            statusMessage = "Cardiology saved successfully.";
             statusCssClass = "alert-success";
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error while saving cardiology changes: {ex.Message}";
+            statusMessage = $"Error while saving Cardiology: {ex.Message}";
             statusCssClass = "alert-danger";
         }
         finally
@@ -663,13 +705,19 @@ else
     {
         await LoadPatientAsync();
 
-        statusMessage = "Patient data reloaded.";
+        statusMessage = $"{GetActiveSectionName()} changes reloaded.";
         statusCssClass = "alert-info";
     }
 
     private void SelectTab(string tabName)
     {
         activeTab = tabName;
+
+        // A save/reload message belongs to the section where it happened.
+        // When the user moves to another tab, clear the old message
+        // so the bottom bar can show the new section status.
+        statusMessage = null;
+        statusCssClass = "alert-info";
     }
 
     private string GetTabButtonClass(string tabName)
@@ -677,6 +725,141 @@ else
         return activeTab == tabName
             ? "btn btn-primary"
             : "btn btn-outline-primary";
+    }
+
+    // The bottom bar uses this helper to show a friendly section name.
+    private string GetActiveSectionName()
+    {
+        return activeTab switch
+        {
+            "overview" => "Overview",
+            "summary" => "Summary",
+            "neurology" => "Neurology",
+            "cardiology" => "Cardiology",
+            _ => "Section"
+        };
+    }
+
+    // This helper tells the bottom bar if the currently opened section has unsaved changes.
+    private bool IsActiveSectionDirty()
+    {
+        return activeTab switch
+        {
+            // Overview includes both the patient overview fields and the timeline.
+            // So the Overview tab is dirty if either part has unsaved changes.
+            "overview" => isOverviewDirty || isTimelineDirty,
+            "summary" => isSummaryDirty,
+            "neurology" => isNeurologyDirty,
+            "cardiology" => isCardiologyDirty,
+            _ => false
+        };
+    }
+
+    // This helper gives the bottom bar a simple readable status message.
+    private string GetActiveSectionStatusText()
+    {
+        // Dirty status is more important than an old success message.
+        // Example: after editing Summary again, show "Summary has unsaved changes"
+        // instead of keeping the previous "Summary saved successfully" message.
+        if (activeTab == "overview")
+        {
+            if (isOverviewDirty && isTimelineDirty)
+                return "Overview and timeline have unsaved changes.";
+
+            if (isOverviewDirty)
+                return "Overview has unsaved changes.";
+
+            if (isTimelineDirty)
+                return "Timeline has unsaved changes.";
+        }
+        else if (IsActiveSectionDirty())
+        {
+            return $"{GetActiveSectionName()} has unsaved changes.";
+        }
+
+        // If there is a recent save/reload/catalog message, show it here.
+        if (!string.IsNullOrWhiteSpace(statusMessage))
+            return statusMessage;
+
+        return $"{GetActiveSectionName()} has loaded.";
+    }
+
+    // This helper changes only the small status text color in the bottom bar.
+    private string GetActiveSectionStatusCssClass()
+    {
+        if (IsActiveSectionDirty())
+            return "text-warning fw-semibold small";
+
+        if (string.IsNullOrWhiteSpace(statusMessage))
+            return "text-muted small";
+
+        if (statusCssClass.Contains("alert-success"))
+            return "text-success fw-semibold small";
+
+        if (statusCssClass.Contains("alert-danger"))
+            return "text-danger fw-semibold small";
+
+        if (statusCssClass.Contains("alert-warning"))
+            return "text-warning fw-semibold small";
+
+        if (statusCssClass.Contains("alert-info"))
+            return "text-info fw-semibold small";
+
+        return "text-muted small";
+    }
+
+    // This method is called by the fixed bottom Save button.
+    // It saves only the currently active section.
+    private async Task SaveActiveSectionAsync()
+    {
+        if (patient is null || isSaving || !IsActiveSectionDirty())
+            return;
+
+        switch (activeTab)
+        {
+            case "overview":
+                // The Overview tab contains two saveable parts:
+                // 1. Overview fields such as diagnosis/admission unit.
+                // 2. Timeline rows.
+                // If both are dirty, save the overview fields first, then the timeline.
+                var overviewWasDirty = isOverviewDirty;
+                var timelineWasDirty = isTimelineDirty;
+
+                if (isOverviewDirty)
+                {
+                    await SaveOverviewAsync();
+
+                    // If the overview save failed, the dirty flag stays true.
+                    // In that case, stop here so the user sees the error clearly.
+                    if (isOverviewDirty)
+                        return;
+                }
+
+                if (isTimelineDirty)
+                {
+                    await SaveTimelineAsync();
+                }
+
+                if (overviewWasDirty && timelineWasDirty && !isOverviewDirty && !isTimelineDirty)
+                {
+                    statusMessage = "Overview and timeline saved successfully.";
+                    statusCssClass = "alert-success";
+                }
+
+                break;
+
+            case "summary":
+                await SaveSummaryAsync();
+                break;
+
+            case "neurology":
+                await SaveNeurologyAsync();
+                break;
+
+            case "cardiology":
+                await SaveCardiologyAsync();
+                break;
+        }
     }
 
     // This helper shows the selected Admission Unit name in the header area.

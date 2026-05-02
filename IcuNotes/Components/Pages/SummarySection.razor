@@ -2,26 +2,19 @@
 @using Microsoft.AspNetCore.Components.Forms
 
 @* This component contains the Summary section UI.
-   It edits the patient's long text notes but lets the parent page keep the save logic. *@
+   Saving and reloading are now controlled by the fixed bottom bar in PatientDetails.razor. *@
 @if (Patient is not null)
 {
-    @* This block shows the Summary header and whether the section has unsaved changes. *@
     <div>
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        @* The section keeps a simple title only.
+           The saved/unsaved message now lives in the bottom bar. *@
+        <div class="mb-3">
             <h5 class="mb-0">Patient Summary</h5>
-
-            @if (IsSummaryDirty)
-            {
-                <span class="text-warning fw-semibold">You have unsaved summary changes.</span>
-            }
-            else
-            {
-                <span class="text-muted">Summary is saved.</span>
-            }
         </div>
 
-        @* This form edits the summary fields and sends the save action back to the parent page. *@
-        <EditForm EditContext="SummaryEditContext" OnValidSubmit="HandleSaveSummaryAsync">
+        @* This form edits the summary fields.
+           The EditContext still allows PatientDetails.razor to detect when fields change. *@
+        <EditForm EditContext="SummaryEditContext">
             <DataAnnotationsValidator />
             <ValidationSummary />
 
@@ -40,22 +33,6 @@
                                rows="5"
                                @bind-Value="Patient.PatientSummary!.EventsTodo" />
             </div>
-
-            @* These buttons let the user either save just the Summary section or reload the patient data. *@
-            <div class="d-flex gap-2">
-                <button type="submit"
-                        class="btn btn-primary"
-                        disabled="@IsSaving">
-                    @(IsSaving ? "Saving..." : "Save Summary Changes")
-                </button>
-
-                <button type="button"
-                        class="btn btn-secondary"
-                        @onclick="HandleReloadAsync"
-                        disabled="@IsSaving">
-                    Reload
-                </button>
-            </div>
         </EditForm>
     </div>
 }
@@ -66,34 +43,8 @@
     public Patient? Patient { get; set; }
 
     // The parent page passes the EditContext so dirty tracking still stays in one place.
+    // When the user edits a Summary field, PatientDetails.razor detects the change
+    // and updates the fixed bottom bar.
     [Parameter, EditorRequired]
     public EditContext SummaryEditContext { get; set; } = default!;
-
-    // This flag tells the component whether to show the unsaved warning for Summary.
-    [Parameter]
-    public bool IsSummaryDirty { get; set; }
-
-    // This flag disables buttons while the parent page is saving data.
-    [Parameter]
-    public bool IsSaving { get; set; }
-
-    // The parent page provides the actual save method for the Summary section.
-    [Parameter, EditorRequired]
-    public EventCallback OnSaveSummary { get; set; }
-
-    // The parent page provides the reload method so this component stays UI-focused.
-    [Parameter, EditorRequired]
-    public EventCallback OnReload { get; set; }
-
-    // This method calls the parent page when the Summary form is submitted.
-    private async Task HandleSaveSummaryAsync()
-    {
-        await OnSaveSummary.InvokeAsync();
-    }
-
-    // This method asks the parent page to reload the patient data.
-    private async Task HandleReloadAsync()
-    {
-        await OnReload.InvokeAsync();
-    }
 }

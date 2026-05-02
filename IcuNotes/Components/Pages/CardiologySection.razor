@@ -2,7 +2,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 
 @* This component contains the Cardiology section UI.
-   It follows the same pattern as NeurologySection.razor.
+   Saving and reloading are now controlled by the fixed bottom bar in PatientDetails.razor.
 
    Important:
    - This component displays and edits cardiology data.
@@ -12,19 +12,9 @@
 @if (Patient?.Cardiology is not null)
 {
     <div>
-        @* This block shows the section title and whether Cardiology has unsaved changes. *@
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">Cardiology</h5>
-
-            @if (IsCardiologyDirty)
-            {
-                <span class="text-warning fw-semibold">You have unsaved cardiology changes.</span>
-            }
-            else
-            {
-                <span class="text-muted">Cardiology is saved.</span>
-            }
-        </div>
+        @* Section title only.
+           The saved/unsaved message now lives in the fixed bottom bar in PatientDetails.razor. *@
+        <h5 class="mb-3">Cardiology</h5>
 
         @* This reusable manager handles adding and editing shared catalog medications.
            Cardiology stays focused only on cardiology-specific medication rows. *@
@@ -33,8 +23,9 @@
                             OnMedicationsChanged="HandleMedicationsChangedAsync"
                             OnStatusMessage="HandleStatusMessageAsync" />
 
-        @* This form edits the cardiology fields but sends the save action back to the parent page. *@
-        <EditForm EditContext="CardiologyEditContext" OnValidSubmit="HandleSaveCardiologyAsync">
+        @* This form edits the cardiology fields.
+           The EditContext still allows PatientDetails.razor to detect field changes. *@
+        <EditForm EditContext="CardiologyEditContext">
             <DataAnnotationsValidator />
             <ValidationSummary />
 
@@ -293,21 +284,8 @@
                 }
             </div>
 
-            @* These buttons keep save and reload behavior controlled by the parent page. *@
-            <div class="d-flex gap-2">
-                <button type="submit"
-                        class="btn btn-primary"
-                        disabled="@IsSaving">
-                    @(IsSaving ? "Saving..." : "Save Cardiology Changes")
-                </button>
-
-                <button type="button"
-                        class="btn btn-secondary"
-                        @onclick="HandleReloadAsync"
-                        disabled="@IsSaving">
-                    Reload
-                </button>
-            </div>
+            @* Save and reload buttons were intentionally removed from this section.
+               The fixed bottom bar in PatientDetails.razor now controls saving and reloading. *@
         </EditForm>
     </div>
 }
@@ -331,21 +309,9 @@ else
     [Parameter, EditorRequired]
     public EditContext CardiologyEditContext { get; set; } = default!;
 
-    // This flag tells the component whether to show the unsaved warning for Cardiology.
-    [Parameter]
-    public bool IsCardiologyDirty { get; set; }
-
     // This flag disables buttons while the parent page is saving data.
     [Parameter]
     public bool IsSaving { get; set; }
-
-    // The parent page provides the actual save method for the Cardiology section.
-    [Parameter, EditorRequired]
-    public EventCallback OnSaveCardiology { get; set; }
-
-    // The parent page provides the reload method so this component stays UI-focused.
-    [Parameter, EditorRequired]
-    public EventCallback OnReload { get; set; }
 
     // The parent page provides the method that adds a medication row to the section.
     [Parameter, EditorRequired]
@@ -363,18 +329,6 @@ else
     // This callback lets the component forward status messages to the parent page.
     [Parameter]
     public EventCallback<string> OnStatusMessage { get; set; }
-
-    // This method asks the parent page to save the Cardiology section.
-    private async Task HandleSaveCardiologyAsync()
-    {
-        await OnSaveCardiology.InvokeAsync();
-    }
-
-    // This method asks the parent page to reload the patient data.
-    private async Task HandleReloadAsync()
-    {
-        await OnReload.InvokeAsync();
-    }
 
     // This method asks the parent page to add a new cardiology medication row.
     private async Task HandleAddCardiologyMedicationAsync(CardiologyMedicationCategory category)

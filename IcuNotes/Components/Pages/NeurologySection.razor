@@ -7,19 +7,11 @@
    The parent page still owns patient saving, dirty tracking, and patient reload. *@
 @if (Patient is not null)
 {
-    @* This block shows the section title and whether Neurology has unsaved changes. *@
+    @* The fixed bottom bar in PatientDetails now shows the saved/unsaved state.
+       This section only shows the Neurology title and fields. *@
     <div>
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="mb-3">
             <h5 class="mb-0">Neurology</h5>
-
-            @if (IsNeurologyDirty)
-            {
-                <span class="text-warning fw-semibold">You have unsaved neurology changes.</span>
-            }
-            else
-            {
-                <span class="text-muted">Neurology is saved.</span>
-            }
         </div>
 
         @* This reusable manager handles adding and editing shared catalog medications.
@@ -29,8 +21,9 @@
                             OnMedicationsChanged="HandleMedicationsChangedAsync"
                             OnStatusMessage="HandleStatusMessageAsync" />
 
-        @* This form edits the neurology fields but sends the save action back to the parent page. *@
-        <EditForm EditContext="NeurologyEditContext" OnValidSubmit="HandleSaveNeurologyAsync">
+        @* This form edits the neurology fields.
+           The parent PatientDetails page owns saving through the fixed bottom bar. *@
+        <EditForm EditContext="NeurologyEditContext">
             <DataAnnotationsValidator />
             <ValidationSummary />
 
@@ -239,21 +232,8 @@
                 }
             </div>
 
-            @* These buttons keep save and reload behavior controlled by the parent page. *@
-            <div class="d-flex gap-2">
-                <button type="submit"
-                        class="btn btn-primary"
-                        disabled="@IsSaving">
-                    @(IsSaving ? "Saving..." : "Save Neurology Changes")
-                </button>
-
-                <button type="button"
-                        class="btn btn-secondary"
-                        @onclick="HandleReloadAsync"
-                        disabled="@IsSaving">
-                    Reload
-                </button>
-            </div>
+            @* Save and reload buttons were removed from this section.
+               The fixed bottom bar in PatientDetails handles Save/Reload for the active section. *@
         </EditForm>
     </div>
 }
@@ -271,21 +251,11 @@
     [Parameter, EditorRequired]
     public EditContext NeurologyEditContext { get; set; } = default!;
 
-    // This flag tells the component whether to show the unsaved warning for Neurology.
-    [Parameter]
-    public bool IsNeurologyDirty { get; set; }
 
     // This flag disables buttons while the parent page is saving data.
     [Parameter]
     public bool IsSaving { get; set; }
 
-    // The parent page provides the actual save method for the Neurology section.
-    [Parameter, EditorRequired]
-    public EventCallback OnSaveNeurology { get; set; }
-
-    // The parent page provides the reload method so this component stays UI-focused.
-    [Parameter, EditorRequired]
-    public EventCallback OnReload { get; set; }
 
     // The parent page provides the method that adds a medication row to the section.
     [Parameter, EditorRequired]
@@ -304,17 +274,6 @@
     [Parameter]
     public EventCallback<string> OnStatusMessage { get; set; }
 
-    // This method asks the parent page to save the Neurology section.
-    private async Task HandleSaveNeurologyAsync()
-    {
-        await OnSaveNeurology.InvokeAsync();
-    }
-
-    // This method asks the parent page to reload the patient data.
-    private async Task HandleReloadAsync()
-    {
-        await OnReload.InvokeAsync();
-    }
 
     // This method asks the parent page to add a new neurology medication row.
     private async Task HandleAddNeurologyMedicationAsync(NeurologyMedicationCategory category)
