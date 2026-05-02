@@ -2,178 +2,288 @@
 @using IcuNotes.Constants
 @using Microsoft.AspNetCore.Components.Forms
 
-@* This component contains the Overview section UI.
-   Timeline is shown inside the Overview section too. *@
+@*
+    OverviewSection.razor
+
+    This component contains:
+    1) Patient overview fields
+    2) Admission unit selection
+    3) Admission unit catalog manager
+    4) Patient timeline rows
+
+    UI goal in this version:
+    - Keep the section compact on mobile.
+    - Use Bootstrap floating labels.
+    - Use Bootstrap grid/card utilities.
+    - Avoid custom CSS.
+    - Avoid JavaScript.
+
+    Important note about placeholders:
+    Bootstrap floating labels require a placeholder attribute.
+    We use placeholder=" " so no visible duplicate text appears.
+*@
+
 @if (Patient is not null)
 {
-    <div>
-        <div class="mb-3">
-            <h5 class="mb-0">Overview</h5>
+    <div class="vstack gap-3">
+
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 text-muted">
+                Overview
+            </h6>
         </div>
 
         @if (!string.IsNullOrWhiteSpace(admissionUnitStatusMessage))
         {
-            <div class="alert alert-success py-2">
+            <div class="alert alert-success py-2 mb-0">
                 @admissionUnitStatusMessage
             </div>
         }
 
-        @* This form should contain ONLY fields that belong to the current Patient overview.
+        @*
+            This form contains ONLY fields that belong to the current patient overview.
 
-           Important:
-           AdmissionUnitsManager is intentionally NOT inside this EditForm anymore.
+            Important:
+            AdmissionUnitsManager is intentionally outside this EditForm.
 
-           Why?
-           If AdmissionUnitsManager is inside this EditForm, its modal InputText controls receive
-           the OverviewEditContext automatically from Blazor. Then typing inside the modal marks
-           Overview as dirty even though the patient was not changed.
+            Why?
+            If AdmissionUnitsManager is inside this EditForm, its modal InputText controls
+            receive the OverviewEditContext automatically from Blazor. Then typing inside
+            the modal marks Overview as dirty even though the patient itself was not changed.
 
-           By keeping AdmissionUnitsManager outside the EditForm, catalog editing is separated
-           from patient overview editing. *@
+            By keeping AdmissionUnitsManager outside the EditForm, catalog editing is separated
+            from patient overview editing.
+        *@
         <EditForm EditContext="OverviewEditContext">
             <DataAnnotationsValidator />
             <ValidationSummary />
 
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Name</label>
-                    <InputText class="form-control"
-                               @bind-Value="Patient.Name" />
-                    <ValidationMessage For="@(() => Patient.Name)" />
-                </div>
+            <div class="card">
+                <div class="card-body p-2 p-sm-3">
 
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Bed</label>
-                    <InputSelect class="form-select"
-                                 @bind-Value="Patient.Bed">
-                        <option value="">-- Select Bed --</option>
+                    <div class="row g-2">
 
-                        @foreach (var bed in BedOptions.All)
-                        {
-                            <option value="@bed">@bed</option>
-                        }
-                    </InputSelect>
-                    <ValidationMessage For="@(() => Patient.Bed)" />
+                        @* Patient name can be wider because names may be long. *@
+                        <div class="col-12 col-md-6">
+                            <div class="form-floating">
+                                <InputText class="form-control"
+                                           id="patientName"
+                                           placeholder=" "
+                                           @bind-Value="Patient.Name" />
+
+                                <label for="patientName">
+                                    Name
+                                </label>
+                            </div>
+
+                            <ValidationMessage For="@(() => Patient.Name)" />
+                        </div>
+
+                        @* Bed is short, so it does not need a wide column. *@
+                        <div class="col-6 col-sm-4 col-md-3">
+                            <div class="form-floating">
+                                <InputSelect class="form-select"
+                                             id="patientBed"
+                                             @bind-Value="Patient.Bed">
+                                    <option value="">Select</option>
+
+                                    @foreach (var bed in BedOptions.All)
+                                    {
+                                        <option value="@bed">@bed</option>
+                                    }
+                                </InputSelect>
+
+                                <label for="patientBed">
+                                    Bed
+                                </label>
+                            </div>
+
+                            <ValidationMessage For="@(() => Patient.Bed)" />
+                        </div>
+
+                        @* Age is short, so it uses a narrow column. *@
+                        <div class="col-6 col-sm-4 col-md-3">
+                            <div class="form-floating">
+                                <InputNumber class="form-control"
+                                             id="patientAge"
+                                             placeholder=" "
+                                             @bind-Value="Patient.Age" />
+
+                                <label for="patientAge">
+                                    Age
+                                </label>
+                            </div>
+
+                            <ValidationMessage For="@(() => Patient.Age)" />
+                        </div>
+
+                        @* Weight is short, so it uses a narrow column. *@
+                        <div class="col-6 col-sm-4 col-md-3">
+                            <div class="form-floating">
+                                <InputNumber class="form-control"
+                                             id="patientWeight"
+                                             placeholder=" "
+                                             @bind-Value="Patient.Weight" />
+
+                                <label for="patientWeight">
+                                    Weight
+                                </label>
+                            </div>
+
+                            <ValidationMessage For="@(() => Patient.Weight)" />
+                        </div>
+
+                        @* Diagnosis may be long, so it stays full width. *@
+                        <div class="col-12">
+                            <div class="form-floating">
+                                <InputText class="form-control"
+                                           id="patientDiagnosis"
+                                           placeholder=" "
+                                           @bind-Value="Patient.Diagnosis" />
+
+                                <label for="patientDiagnosis">
+                                    Diagnosis
+                                </label>
+                            </div>
+
+                            <ValidationMessage For="@(() => Patient.Diagnosis)" />
+                        </div>
+
+                        @* Admission unit names may be long, so this stays wider. *@
+                        <div class="col-12 col-md-8">
+                            <div class="form-floating">
+                                <InputSelect class="form-select"
+                                             id="patientAdmissionUnit"
+                                             @bind-Value="Patient.AdmissionUnitCatalogId">
+                                    <option value="">Select</option>
+
+                                    @foreach (var unit in AdmissionUnits)
+                                    {
+                                        <option value="@unit.Id">@unit.Name</option>
+                                    }
+                                </InputSelect>
+
+                                <label for="patientAdmissionUnit">
+                                    Admission Unit
+                                </label>
+                            </div>
+
+                            <div class="form-text">
+                                Saved from the bottom bar.
+                            </div>
+                        </div>
+
+                    </div>
+
                 </div>
             </div>
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Age</label>
-                    <InputNumber class="form-control"
-                                 @bind-Value="Patient.Age" />
-                    <ValidationMessage For="@(() => Patient.Age)" />
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Weight</label>
-                    <InputNumber class="form-control"
-                                 @bind-Value="Patient.Weight" />
-                    <ValidationMessage For="@(() => Patient.Weight)" />
-                </div>
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Diagnosis</label>
-                <InputText class="form-control"
-                           @bind-Value="Patient.Diagnosis" />
-                <ValidationMessage For="@(() => Patient.Diagnosis)" />
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Admission Unit</label>
-                <InputSelect class="form-select"
-                             @bind-Value="Patient.AdmissionUnitCatalogId">
-                    <option value="">-- Select Admission Unit --</option>
-
-                    @foreach (var unit in AdmissionUnits)
-                    {
-                        <option value="@unit.Id">@unit.Name</option>
-                    }
-                </InputSelect>
-
-                <div class="form-text">
-                    Selecting a unit here changes the current patient and will be saved from the bottom bar.
-                </div>
-            </div>
-
         </EditForm>
 
-        @* This reusable manager handles the shared Admission Unit catalog only.
+        @*
+            This reusable manager handles the shared Admission Unit catalog only.
 
-           It is outside the Overview EditForm on purpose.
+            It is outside the Overview EditForm on purpose.
 
-           Clean separation:
-           - This manager adds/edits catalog rows.
-           - The dropdown above selects the admission unit for this patient.
-           - The bottom Save button saves the patient's selected admission unit. *@
+            Clean separation:
+            - This manager adds/edits catalog rows.
+            - The dropdown above selects the admission unit for this patient.
+            - The bottom Save button saves the patient's selected admission unit.
+        *@
         <AdmissionUnitsManager AdmissionUnits="AdmissionUnits"
                                IsDisabled="IsSaving"
                                OnAdmissionUnitsChanged="HandleAdmissionUnitsChangedAsync"
                                OnStatusMessage="HandleAdmissionUnitStatusMessageAsync" />
 
-        <hr class="my-4" />
-
         @* Timeline is part of Overview, but it has its own EditContext for dirty tracking. *@
-        <div>
-            <div class="mb-3">
-                <h5 class="mb-0">Timeline</h5>
-            </div>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+            <h6 class="mb-0 text-muted">
+                Timeline
+            </h6>
 
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div></div>
+            <button type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    @onclick="HandleAddTimelineEventAsync"
+                    disabled="@IsSaving">
+                + Add Event
+            </button>
+        </div>
 
-                <button type="button"
-                        class="btn btn-outline-primary"
-                        @onclick="HandleAddTimelineEventAsync"
-                        disabled="@IsSaving">
-                    Add Timeline Event
-                </button>
-            </div>
+        @if (OrderedDateEvents.Any())
+        {
+            <EditForm EditContext="TimelineEditContext">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
 
-            @if (OrderedDateEvents.Any())
-            {
-                <EditForm EditContext="TimelineEditContext">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
-
-                    @foreach (var item in OrderedDateEvents)
+                <div class="vstack gap-2">
+                    @for (var i = 0; i < OrderedDateEvents.Count; i++)
                     {
-                        <div class="border rounded p-3 mb-3">
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Event Date</label>
-                                    <InputDate class="form-control"
-                                               @bind-Value="item.EventDate" />
+                        var item = OrderedDateEvents[i];
+
+                        <div class="card">
+                            <div class="card-body p-2 p-sm-3">
+
+                                <div class="row g-2">
+
+                                    @*
+                                        Event date is always a fixed-length value,
+                                        so it gets a narrower column.
+                                    *@
+                                    <div class="col-8 col-sm-5 col-md-3">
+                                        <div class="form-floating">
+                                            <InputDate class="form-control"
+                                                       id="@($"timelineDate_{i}")"
+                                                       @bind-Value="item.EventDate" />
+
+                                            <label for="@($"timelineDate_{i}")">
+                                                Event Date
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    @*
+                                        Event title can take the remaining width.
+                                    *@
+                                    <div class="col-12 col-md">
+                                        <div class="form-floating">
+                                            <InputText class="form-control"
+                                                       id="@($"timelineTitle_{i}")"
+                                                       placeholder=" "
+                                                       @bind-Value="item.Title" />
+
+                                            <label for="@($"timelineTitle_{i}")">
+                                                Title
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    @*
+                                        Remove button kept like the old version:
+                                        after the input fields, not beside the date.
+                                    *@
+                                    <div class="col-12">
+                                        <button type="button"
+                                                class="btn btn-outline-danger btn-sm"
+                                                @onclick="() => HandleRemoveTimelineEventAsync(item)"
+                                                disabled="@IsSaving">
+                                            Delete Date
+                                        </button>
+                                    </div>
+
                                 </div>
 
-                                <div class="col-md-8 mb-3">
-                                    <label class="form-label">Title</label>
-                                    <InputText class="form-control"
-                                               @bind-Value="item.Title" />
-                                </div>
-                            </div>
-
-                            <div class="d-flex gap-2">
-                                <button type="button"
-                                        class="btn btn-outline-danger btn-sm"
-                                        @onclick="() => HandleRemoveTimelineEventAsync(item)">
-                                    Remove From Page
-                                </button>
                             </div>
                         </div>
                     }
-
-                </EditForm>
-            }
-            else
-            {
-                <div class="alert alert-light border">
-                    No timeline events added yet.
                 </div>
+            </EditForm>
+        }
+        else
+        {
+            <div class="alert alert-light border mb-0">
+                No timeline events added yet.
+            </div>
+        }
 
-            }
-        </div>
     </div>
 }
 

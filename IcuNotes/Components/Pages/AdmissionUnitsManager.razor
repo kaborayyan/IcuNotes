@@ -2,41 +2,71 @@
 @using Microsoft.AspNetCore.Components.Forms
 @inject IcuNotes.Services.PatientService PatientService
 
-@* This component manages the shared Admission Unit catalog only.
+@*
+    AdmissionUnitsManager.razor
 
-   Important design rule:
-   - This component adds and edits AdmissionUnitCatalog rows.
-   - It does NOT decide which admission unit belongs to the current patient.
-   - The current patient's selected admission unit is Overview data,
-     so that must stay inside OverviewSection. *@
+    This component manages the shared Admission Unit catalog only.
 
-<div class="d-flex gap-2 mb-3">
-    <button type="button"
-            class="btn btn-outline-secondary"
-            @onclick="OpenAddAdmissionUnitModal"
-            disabled="@IsBusy">
-        Add New Admission Unit
-    </button>
+    Important design rule:
+    - This component adds and edits AdmissionUnitCatalog rows.
+    - It does NOT decide which admission unit belongs to the current patient.
+    - The current patient's selected admission unit is Overview data,
+      so that must stay inside OverviewSection.razor.
 
-    <button type="button"
-            class="btn btn-outline-secondary"
-            @onclick="OpenEditAdmissionUnitModal"
-            disabled="@IsBusy">
-        Edit Admission Unit
-    </button>
+    UI update in this version:
+    - Uses Bootstrap as much as possible.
+    - Add/Edit buttons are compact and equal width.
+    - Modals use Bootstrap modal classes.
+    - The dark backdrop uses Bootstrap modal-backdrop.
+    - No custom CSS.
+    - No JavaScript.
+*@
+
+@*
+    Compact catalog action buttons.
+
+    Bootstrap grid gives both buttons equal width.
+    btn-sm makes them less dominant in the Overview section.
+*@
+<div class="row g-2">
+    <div class="col-6">
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm w-100"
+                @onclick="OpenAddAdmissionUnitModal"
+                disabled="@IsBusy">
+            Add Unit
+        </button>
+    </div>
+
+    <div class="col-6">
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm w-100"
+                @onclick="OpenEditAdmissionUnitModal"
+                disabled="@IsBusy">
+            Edit Unit
+        </button>
+    </div>
 </div>
 
 @* This modal lets the user create a new reusable Admission Unit in the shared catalog. *@
 @if (showAddAdmissionUnitModal)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
-        <div class="modal-dialog">
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         role="dialog"
+         aria-modal="true">
+
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add New Admission Unit</h5>
+
+                <div class="modal-header py-2">
+                    <h5 class="modal-title fs-6">
+                        Add Admission Unit
+                    </h5>
 
                     <button type="button"
                             class="btn-close"
+                            aria-label="Close"
                             @onclick="CloseAddAdmissionUnitModal"
                             disabled="@IsBusy">
                     </button>
@@ -45,49 +75,90 @@
                 <div class="modal-body">
                     @if (!string.IsNullOrWhiteSpace(newAdmissionUnitErrorMessage))
                     {
-                        <div class="alert alert-warning">
+                        <div class="alert alert-warning py-2">
                             @newAdmissionUnitErrorMessage
                         </div>
                     }
 
-                    <div class="mb-3">
-                        <label class="form-label">Admission Unit Name</label>
-                        <InputText class="form-control"
-                                   @bind-Value="newAdmissionUnitName" />
+                    @*
+                        Normal HTML input is used here instead of InputText.
+
+                        Why?
+                        This component is a catalog manager, not part of the patient
+                        Overview EditForm. A normal input avoids accidental interaction
+                        with any parent EditContext.
+                    *@
+                    <div class="form-floating">
+                        <input type="text"
+                               class="form-control"
+                               id="newAdmissionUnitName"
+                               placeholder=" "
+                               @bind="newAdmissionUnitName"
+                               @bind:event="oninput"
+                               disabled="@IsBusy" />
+
+                        <label for="newAdmissionUnitName">
+                            Admission Unit Name
+                        </label>
                     </div>
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button"
-                            class="btn btn-secondary"
-                            @onclick="CloseAddAdmissionUnitModal"
-                            disabled="@IsBusy">
-                        Cancel
-                    </button>
+                    <div class="row g-2 w-100">
+                        <div class="col-6">
+                            <button type="button"
+                                    class="btn btn-secondary w-100"
+                                    @onclick="CloseAddAdmissionUnitModal"
+                                    disabled="@IsBusy">
+                                Cancel
+                            </button>
+                        </div>
 
-                    <button type="button"
-                            class="btn btn-primary"
-                            @onclick="SaveNewAdmissionUnitAsync"
-                            disabled="@IsBusy">
-                        @(IsBusy ? "Saving..." : "Save Admission Unit")
-                    </button>
+                        <div class="col-6">
+                            <button type="button"
+                                    class="btn btn-primary w-100"
+                                    @onclick="SaveNewAdmissionUnitAsync"
+                                    disabled="@IsBusy">
+                                @(IsBusy ? "Saving..." : "Save")
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
             </div>
         </div>
+    </div>
+
+    @*
+        Bootstrap modal backdrop.
+
+        Clicking the backdrop closes the modal.
+        This is still Blazor-controlled and does not use Bootstrap JavaScript.
+    *@
+    <div class="modal-backdrop fade show"
+         @onclick="CloseAddAdmissionUnitModal">
     </div>
 }
 
 @* This modal lets the user edit an existing reusable Admission Unit from the shared catalog. *@
 @if (showEditAdmissionUnitModal)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
-        <div class="modal-dialog">
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         role="dialog"
+         aria-modal="true">
+
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Admission Unit</h5>
+
+                <div class="modal-header py-2">
+                    <h5 class="modal-title fs-6">
+                        Edit Admission Unit
+                    </h5>
 
                     <button type="button"
                             class="btn-close"
+                            aria-label="Close"
                             @onclick="CloseEditAdmissionUnitModal"
                             disabled="@IsBusy">
                     </button>
@@ -96,7 +167,7 @@
                 <div class="modal-body">
                     @if (!string.IsNullOrWhiteSpace(editAdmissionUnitErrorMessage))
                     {
-                        <div class="alert alert-warning">
+                        <div class="alert alert-warning py-2">
                             @editAdmissionUnitErrorMessage
                         </div>
                     }
@@ -109,43 +180,81 @@
                     }
                     else
                     {
-                        <div class="mb-3">
-                            <label class="form-label">Select Admission Unit</label>
-                            <select class="form-select"
-                                    value="@selectedAdmissionUnitToEditId"
-                                    @onchange="OnSelectedAdmissionUnitToEditChanged">
-                                @foreach (var unit in AdmissionUnits)
-                                {
-                                    <option value="@unit.Id">@unit.Name</option>
-                                }
-                            </select>
-                        </div>
+                        <div class="vstack gap-3">
 
-                        <div class="mb-3">
-                            <label class="form-label">Admission Unit Name</label>
-                            <InputText class="form-control"
-                                       @bind-Value="editAdmissionUnitName" />
+                            <div class="form-floating">
+                                <select class="form-select"
+                                        id="selectedAdmissionUnitToEdit"
+                                        value="@selectedAdmissionUnitToEditId"
+                                        @onchange="OnSelectedAdmissionUnitToEditChanged"
+                                        disabled="@IsBusy">
+                                    @foreach (var unit in AdmissionUnits)
+                                    {
+                                        <option value="@unit.Id">@unit.Name</option>
+                                    }
+                                </select>
+
+                                <label for="selectedAdmissionUnitToEdit">
+                                    Select Unit
+                                </label>
+                            </div>
+
+                            @*
+                                Normal HTML input is used here instead of InputText
+                                for the same reason as the Add modal.
+                            *@
+                            <div class="form-floating">
+                                <input type="text"
+                                       class="form-control"
+                                       id="editAdmissionUnitName"
+                                       placeholder=" "
+                                       @bind="editAdmissionUnitName"
+                                       @bind:event="oninput"
+                                       disabled="@IsBusy" />
+
+                                <label for="editAdmissionUnitName">
+                                    Unit Name
+                                </label>
+                            </div>
+
                         </div>
                     }
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button"
-                            class="btn btn-secondary"
-                            @onclick="CloseEditAdmissionUnitModal"
-                            disabled="@IsBusy">
-                        Cancel
-                    </button>
+                    <div class="row g-2 w-100">
+                        <div class="col-6">
+                            <button type="button"
+                                    class="btn btn-secondary w-100"
+                                    @onclick="CloseEditAdmissionUnitModal"
+                                    disabled="@IsBusy">
+                                Cancel
+                            </button>
+                        </div>
 
-                    <button type="button"
-                            class="btn btn-primary"
-                            @onclick="SaveEditedAdmissionUnitAsync"
-                            disabled="@IsBusy">
-                        @(IsBusy ? "Saving..." : "Save Changes")
-                    </button>
+                        <div class="col-6">
+                            <button type="button"
+                                    class="btn btn-primary w-100"
+                                    @onclick="SaveEditedAdmissionUnitAsync"
+                                    disabled="@(IsBusy || !AdmissionUnits.Any())">
+                                @(IsBusy ? "Saving..." : "Save")
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
             </div>
         </div>
+    </div>
+
+    @*
+        Bootstrap modal backdrop.
+
+        Clicking the backdrop closes the modal.
+        This is still Blazor-controlled and does not use Bootstrap JavaScript.
+    *@
+    <div class="modal-backdrop fade show"
+         @onclick="CloseEditAdmissionUnitModal">
     </div>
 }
 
@@ -166,7 +275,6 @@
     public bool IsSaving { get; set; }
 
     // This callback lets the parent know that the catalog list has changed.
-    // In the next step, OverviewSection can use this to refresh its dropdown cleanly.
     [Parameter]
     public EventCallback<List<AdmissionUnitCatalog>> OnAdmissionUnitsChanged { get; set; }
 
@@ -174,9 +282,9 @@
     [Parameter]
     public EventCallback<string> OnStatusMessage { get; set; }
 
-    // These old parameters are kept only so the current OverviewSection does not break.
+    // These old parameters are kept only so older parent code does not break.
     // They are intentionally NOT used anymore.
-    // This is what separates the catalog manager from the patient overview.
+    // This separates the catalog manager from the patient overview.
     [Parameter]
     public Patient? Patient { get; set; }
 
@@ -207,14 +315,19 @@
     private void OpenAddAdmissionUnitModal()
     {
         showEditAdmissionUnitModal = false;
+
         newAdmissionUnitName = string.Empty;
         newAdmissionUnitErrorMessage = null;
+
         showAddAdmissionUnitModal = true;
     }
 
     // This method closes the Add modal and clears old validation messages.
     private void CloseAddAdmissionUnitModal()
     {
+        if (IsBusy)
+            return;
+
         showAddAdmissionUnitModal = false;
         newAdmissionUnitErrorMessage = null;
     }
@@ -225,6 +338,7 @@
     private void OpenEditAdmissionUnitModal()
     {
         showAddAdmissionUnitModal = false;
+
         editAdmissionUnitErrorMessage = null;
         showEditAdmissionUnitModal = true;
 
@@ -246,6 +360,9 @@
     // This method closes the Edit modal and clears temporary selection state.
     private void CloseEditAdmissionUnitModal()
     {
+        if (IsBusy)
+            return;
+
         showEditAdmissionUnitModal = false;
         selectedAdmissionUnitToEditId = 0;
         editAdmissionUnitName = string.Empty;

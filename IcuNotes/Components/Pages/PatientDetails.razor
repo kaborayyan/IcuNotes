@@ -7,10 +7,8 @@
 
 <PageTitle>Patient Details</PageTitle>
 
-<h3 class="mb-4">Patient Details</h3>
-
-@* Save/reload feedback is now shown in the fixed bottom bar,
-   so the top of the page stays clean. *@
+@* Save/reload feedback is shown in the fixed bottom bar,
+   so the top of the page stays as clean as possible. *@
 @if (isLoading)
 {
     <p>Loading patient details...</p>
@@ -26,89 +24,124 @@ else if (patient is null)
 else
 {
     <div class="card shadow-sm">
-        <div class="card-body">
+        <div class="card-body p-2 p-sm-3">
 
-            <div class="mb-4">
-                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
-                    <div>
-                        <h4 class="card-title mb-1">@patient.Name</h4>
+            @* Patient section tabs.
 
-                        <div class="text-muted">
-                            Patient ID: @patient.Id
-                        </div>
-                    </div>
+               UI goals:
+               - Keep the tabs easy to reach while scrolling.
+               - Avoid horizontal page scrolling on mobile.
+               - Keep patient name and bed always visible.
+               - Use Bootstrap utilities as much as possible.
+               - Avoid JavaScript.
 
-                    <div class="text-md-end">
-                        <div>
-                            <span class="fw-bold">Bed:</span> @patient.Bed
-                        </div>
+               The patient name and bed now live inside this sticky tab container.
+               This makes them visible while reviewing any section.
+            *@
+            <div class="position-sticky bg-white border rounded shadow-sm p-2 mb-3"
+                 style="top: calc(3rem + env(safe-area-inset-top)); z-index: 1010;">
 
-                        <div>
-                            <span class="fw-bold">Diagnosis:</span>
-                            @if (!string.IsNullOrWhiteSpace(patient.Diagnosis))
-                            {
-                                @patient.Diagnosis
-                            }
-                            else
-                            {
-                                <span class="text-muted">Not added</span>
-                            }
-                        </div>
+                @* Compact patient identity row.
 
-                        <div>
-                            <span class="fw-bold">Admission Unit:</span>
-                            @if (!string.IsNullOrWhiteSpace(GetSelectedAdmissionUnitName()))
-                            {
-                                @GetSelectedAdmissionUnitName()
-                            }
-                            else
-                            {
-                                <span class="text-muted">Not added</span>
-                            }
-                        </div>
-                    </div>
+                   This replaces the old larger patient header.
+                   It uses normal text size so it does not waste vertical space.
+                *@
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="fw-semibold text-truncate">
+                        @patient.Name
+                    </span>
+
+                    @if (!string.IsNullOrWhiteSpace(patient.Bed))
+                    {
+                        <span class="badge bg-light text-dark border flex-shrink-0">
+                            Bed @patient.Bed
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-light text-muted border flex-shrink-0">
+                            No bed
+                        </span>
+                    }
                 </div>
-            </div>
 
-            @* Keep the page tabs small. Overview now includes the timeline,
-               so Timeline no longer needs its own separate tab. *@
-            <div class="mb-4">
-                <div class="d-flex flex-wrap gap-2">
-                    <button class="@GetTabButtonClass("overview")"
-                            @onclick='() => SelectTab("overview")'>
-                        Overview
-                        @if (isOverviewDirty || isTimelineDirty)
-                        {
-                            <span class="badge bg-warning text-dark ms-2">Unsaved</span>
-                        }
-                    </button>
+                @* Horizontally scrollable tabs.
 
-                    <button class="@GetTabButtonClass("summary")"
-                            @onclick='() => SelectTab("summary")'>
-                        Summary
-                        @if (isSummaryDirty)
-                        {
-                            <span class="badge bg-warning text-dark ms-2">Unsaved</span>
-                        }
-                    </button>
+                   overflow-auto:
+                   Allows the tab row to scroll left/right on mobile.
 
-                    <button class="@GetTabButtonClass("neurology")"
-                            @onclick='() => SelectTab("neurology")'>
-                        Neurology
-                        @if (isNeurologyDirty)
-                        {
-                            <span class="badge bg-warning text-dark ms-2">Unsaved</span>
-                        }
-                    </button>
+                   flex-nowrap:
+                   Prevents the tabs from wrapping into multiple lines.
 
-                    <button class="@GetTabButtonClass("cardiology")"
-                            @onclick='() => SelectTab("cardiology")'>
-                        Cardiology
-                        @if (isCardiologyDirty)
-                        {
-                            <span class="badge bg-warning text-dark ms-2">Unsaved</span>
-                        }
-                    </button>
+                   flex-shrink-0 in GetTabButtonClass:
+                   Prevents each tab from being squeezed too much.
+                *@
+                <div class="overflow-auto">
+                    <div class="nav nav-pills flex-nowrap gap-2"
+                         role="tablist"
+                         aria-label="Patient sections">
+
+                        <button type="button"
+                                class='@GetTabButtonClass("overview")'
+                                role="tab"
+                                aria-selected='@IsTabActive("overview")'
+                                @onclick='() => SelectTab("overview")'>
+                            <span>Overview</span>
+
+                            @if (isOverviewDirty || isTimelineDirty)
+                            {
+                                <span class="badge rounded-pill bg-warning text-dark ms-2">
+                                    @GetOverviewTabUnsavedText()
+                                </span>
+                            }
+                        </button>
+
+                        <button type="button"
+                                class='@GetTabButtonClass("summary")'
+                                role="tab"
+                                aria-selected='@IsTabActive("summary")'
+                                @onclick='() => SelectTab("summary")'>
+                            <span>Summary</span>
+
+                            @if (isSummaryDirty)
+                            {
+                                <span class="badge rounded-pill bg-warning text-dark ms-2">
+                                    Unsaved
+                                </span>
+                            }
+                        </button>
+
+                        <button type="button"
+                                class='@GetTabButtonClass("neurology")'
+                                role="tab"
+                                aria-selected='@IsTabActive("neurology")'
+                                @onclick='() => SelectTab("neurology")'>
+                            <span>Neurology</span>
+
+                            @if (isNeurologyDirty)
+                            {
+                                <span class="badge rounded-pill bg-warning text-dark ms-2">
+                                    Unsaved
+                                </span>
+                            }
+                        </button>
+
+                        <button type="button"
+                                class='@GetTabButtonClass("cardiology")'
+                                role="tab"
+                                aria-selected='@IsTabActive("cardiology")'
+                                @onclick='() => SelectTab("cardiology")'>
+                            <span>Cardiology</span>
+
+                            @if (isCardiologyDirty)
+                            {
+                                <span class="badge rounded-pill bg-warning text-dark ms-2">
+                                    Unsaved
+                                </span>
+                            }
+                        </button>
+
+                    </div>
                 </div>
             </div>
 
@@ -172,13 +205,14 @@ else
     <div class="patient-details-bottom-spacer"></div>
 
     @* Fixed bottom action bar.
-       For now, the old save/reload buttons inside each section remain in place.
-       This makes the new bar safe to test without removing working UI. *@
+
+       This bar saves or reloads only the currently active section.
+       The section components do not need their own Save/Reload buttons anymore.
+    *@
     <div class="fixed-bottom patient-details-action-bar bg-white border-top shadow-sm">
         <div class="container-fluid">
             <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2">
                 <div>
-
                     <div class="@GetActiveSectionStatusCssClass()">
                         @GetActiveSectionStatusText()
                     </div>
@@ -213,8 +247,8 @@ else
 
 <style>
     /* The fixed action bar sits at the bottom of the screen.
-               It uses mostly Bootstrap classes in the markup.
-               These small CSS rules only handle spacing and mobile safety. */
+           It uses mostly Bootstrap classes in the markup.
+           These small CSS rules only handle spacing and mobile safe-area padding. */
     .patient-details-action-bar {
         z-index: 1030;
         padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
@@ -722,9 +756,42 @@ else
 
     private string GetTabButtonClass(string tabName)
     {
+        /*
+            These classes make each tab look like a Bootstrap pill.
+
+            text-nowrap:
+            Prevents tab text from breaking into two lines on a phone.
+
+            flex-shrink-0:
+            Prevents tabs from being squeezed inside the horizontal scroller.
+
+            active:
+            Bootstrap uses this class to highlight the selected nav-link.
+        */
         return activeTab == tabName
-            ? "btn btn-primary"
-            : "btn btn-outline-primary";
+            ? "nav-link active text-nowrap flex-shrink-0"
+            : "nav-link text-nowrap flex-shrink-0";
+    }
+
+    private bool IsTabActive(string tabName)
+    {
+        return activeTab == tabName;
+    }
+
+    private string GetOverviewTabUnsavedText()
+    {
+        /*
+            The Overview tab contains two editable parts:
+            1) the overview fields
+            2) the timeline
+
+            If both changed, show "2 unsaved" so the badge gives more useful
+            information than a generic unsaved message.
+        */
+        if (isOverviewDirty && isTimelineDirty)
+            return "2 unsaved";
+
+        return "Unsaved";
     }
 
     // The bottom bar uses this helper to show a friendly section name.
@@ -860,17 +927,6 @@ else
                 await SaveCardiologyAsync();
                 break;
         }
-    }
-
-    // This helper shows the selected Admission Unit name in the header area.
-    private string? GetSelectedAdmissionUnitName()
-    {
-        if (patient?.AdmissionUnitCatalogId is null)
-            return null;
-
-        return admissionUnits
-            .FirstOrDefault(x => x.Id == patient.AdmissionUnitCatalogId.Value)
-            ?.Name;
     }
 
     private void DisposeEditContexts()

@@ -1,69 +1,116 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <header class="top-bar">
-        <!--
-            The hamburger button opens the left sliding menu.
-            We use a normal Blazor @onclick event, so no JavaScript is needed.
-        -->
-        <button class="hamburger-button"
-                type="button"
-                @onclick="OpenMenu"
-                aria-label="Open navigation menu">
-            ☰
-        </button>
+<div class="min-vh-100 d-flex flex-column bg-light">
 
-        <div class="top-bar-title">ICU Notes</div>
+    <!--
+        Compact Bootstrap navbar.
 
-        <!--
-            The top bar links were removed from here.
-            Navigation now lives inside the sliding side menu below.
-        -->
+        Most of the layout is Bootstrap:
+        - navbar
+        - navbar-dark
+        - bg-dark
+        - sticky-top
+        - px / py spacing utilities
+
+        app-safe-top is the only small custom helper.
+        It protects the navbar from the Android status bar.
+    -->
+    <header class="navbar navbar-dark bg-dark sticky-top px-2 py-1 app-safe-top">
+        <div class="container-fluid px-0">
+
+            <!--
+                Hamburger button.
+
+                This opens the side menu using Blazor state.
+                No JavaScript is used.
+            -->
+            <button class="btn btn-dark btn-sm px-2 py-1 me-2"
+                    type="button"
+                    @onclick="OpenMenu"
+                    aria-label="Open navigation menu">
+                ☰
+            </button>
+
+            <span class="navbar-brand mb-0 fs-6">
+                ICU Notes
+            </span>
+
+        </div>
     </header>
 
     @if (isMenuOpen)
     {
         <!--
-            The backdrop covers the screen behind the menu.
-            Clicking it closes the menu.
+            Bootstrap-style offcanvas backdrop.
+
+            We render it manually because we are not using Bootstrap JavaScript.
         -->
-        <div class="menu-backdrop" @onclick="CloseMenu"></div>
+        <div class="offcanvas-backdrop fade show"
+             @onclick="CloseMenu">
+        </div>
     }
 
     <!--
-        Left sliding menu.
-        The CSS class changes depending on isMenuOpen.
-    -->
-    <aside class="side-menu @(isMenuOpen ? "side-menu-open" : "")">
-        <div class="side-menu-header">
-            <div class="side-menu-title">Menu</div>
+        Bootstrap offcanvas menu.
 
-            <button class="close-menu-button"
-                    type="button"
-                    @onclick="CloseMenu"
-                    aria-label="Close navigation menu">
-                X
+        Bootstrap normally opens/closes this with JavaScript.
+        Here Blazor controls it by adding/removing the "show" class.
+
+        This avoids JavaScript while still using Bootstrap's offcanvas styling.
+    -->
+    <aside class="offcanvas offcanvas-start @(isMenuOpen ? "show" : "")"
+           tabindex="-1"
+           aria-labelledby="sideMenuTitle">
+
+        <div class="offcanvas-header bg-dark text-white py-2 app-safe-top">
+            <h5 class="offcanvas-title fs-6"
+                id="sideMenuTitle">
+                Menu
+            </h5>
+
+            <button type="button"
+                    class="btn-close btn-close-white"
+                    aria-label="Close navigation menu"
+                    @onclick="CloseMenu">
             </button>
         </div>
 
-        <nav class="side-menu-links">
+        <div class="offcanvas-body p-2">
+
             <!--
-                Each link closes the menu after navigation.
-                href keeps navigation simple and reliable in a MAUI-Blazor Hybrid app.
+                Bootstrap list-group gives us clean menu links
+                without custom CSS.
             -->
-            <a href="/" @onclick="CloseMenu">Home</a>
-            <a href="/patients" @onclick="CloseMenu">Active Patients</a>
-            <a href="/archived-patients" @onclick="CloseMenu">Archived Patients</a>
-        </nav>
+            <nav class="list-group list-group-flush">
+                <a class="list-group-item list-group-item-action"
+                       href="/"
+                       @onclick="CloseMenu">
+                    Home
+                </a>
+
+                <a class="list-group-item list-group-item-action"
+                       href="/patients"
+                       @onclick="CloseMenu">
+                    Active Patients
+                </a>
+
+                <a class="list-group-item list-group-item-action"
+                       href="/archived-patients"
+                       @onclick="CloseMenu">
+                    Archived Patients
+                </a>
+            </nav>
+
+        </div>
     </aside>
 
-    <main class="main-content">
+    <main class="flex-fill p-3">
         @Body
     </main>
 </div>
 
 @code {
-    // Tracks whether the left sliding menu is currently visible.
+    // Tracks whether the left side menu is currently visible.
     private bool isMenuOpen = false;
 
     private void OpenMenu()
@@ -78,157 +125,25 @@
 }
 
 <style>
-    .page {
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        background-color: #f8f9fa;
+    /*
+            Minimal custom CSS.
+
+            Bootstrap handles almost everything else.
+
+            This class protects the top navbar and offcanvas header from
+            the Android status bar area.
+        */
+    .app-safe-top {
+        padding-top: calc(0.25rem + env(safe-area-inset-top, 0px)) !important;
     }
-
-    .top-bar {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        /*
-                Normal top-bar padding for desktop.
-                env(safe-area-inset-top) helps on devices that report a safe area.
-            */
-        padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 12px 20px;
-        background-color: #1f2937;
-        color: white;
-        border-bottom: 1px solid #374151;
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-    }
-
-    .hamburger-button {
-        width: 40px;
-        height: 40px;
-        border: none;
-        border-radius: 8px;
-        background-color: transparent;
-        color: white;
-        font-size: 1.6rem;
-        line-height: 1;
-        cursor: pointer;
-    }
-
-        .hamburger-button:hover {
-            background-color: #374151;
-        }
-
-    .top-bar-title {
-        font-size: 1.2rem;
-        font-weight: bold;
-    }
-
-    .main-content {
-        flex: 1;
-        padding: 20px;
-    }
-
-    .menu-backdrop {
-        position: fixed;
-        inset: 0;
-        background-color: rgba(0, 0, 0, 0.35);
-        z-index: 1100;
-    }
-
-    .side-menu {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 280px;
-        max-width: 85vw;
-        /*
-                100dvh behaves better than 100vh on mobile browsers/WebViews
-                because it follows the dynamic visible viewport height.
-            */
-        height: 100dvh;
-        background-color: white;
-        box-shadow: 4px 0 16px rgba(0, 0, 0, 0.18);
-        transform: translateX(-100%);
-        transition: transform 0.2s ease-in-out;
-        z-index: 1200;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .side-menu-open {
-        transform: translateX(0);
-    }
-
-    .side-menu-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        /*
-                Same safe-area idea as the top bar, so the menu header
-                does not sit underneath the Android status bar.
-            */
-        padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 16px 18px;
-        background-color: #1f2937;
-        color: white;
-    }
-
-    .side-menu-title {
-        font-size: 1.1rem;
-        font-weight: bold;
-    }
-
-    .close-menu-button {
-        width: 36px;
-        height: 36px;
-        border: none;
-        border-radius: 8px;
-        background-color: transparent;
-        color: white;
-        font-size: 1.8rem;
-        line-height: 1;
-        cursor: pointer;
-    }
-
-        .close-menu-button:hover {
-            background-color: #374151;
-        }
-
-    .side-menu-links {
-        display: flex;
-        flex-direction: column;
-        padding: 12px;
-        gap: 6px;
-    }
-
-        .side-menu-links a {
-            display: block;
-            padding: 12px 14px;
-            border-radius: 10px;
-            color: #111827;
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-            .side-menu-links a:hover {
-                background-color: #f3f4f6;
-            }
 
     /*
-            Some Android WebViews do not always provide a useful safe-area value.
-            This small-screen fallback adds extra breathing room at the top only on
-            phone-sized screens, where the status-bar overlap was seen.
+            Some Android WebViews do not report safe-area-inset-top properly.
+            This fallback keeps a small safe top space on phone-sized screens.
         */
     @@media (max-width: 768px) {
-        .top-bar {
-            padding-top: calc(12px + max(env(safe-area-inset-top, 0px), 24px));
-        }
-
-        .side-menu-header {
-            padding-top: calc(16px + max(env(safe-area-inset-top, 0px), 24px));
-        }
-
-        .main-content {
-            padding: 16px;
+        .app-safe-top {
+            padding-top: calc(0.25rem + max(env(safe-area-inset-top, 0px), 24px)) !important;
         }
     }
 </style>
