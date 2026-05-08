@@ -2,38 +2,47 @@
 @using Microsoft.AspNetCore.Components.Forms
 
 @* This component contains the Summary section UI.
-   Saving and reloading are now controlled by the fixed bottom bar in PatientDetails.razor. *@
+   Saving and reloading are controlled by the fixed bottom bar in PatientDetails.razor. *@
 @if (Patient is not null)
 {
-    <div>
-        @* The section keeps a simple title only.
-           The saved/unsaved message now lives in the bottom bar. *@
-        <div class="mb-3">
-            <h5 class="mb-0">Patient Summary</h5>
+    @* A Bootstrap card gives the section a compact mobile-friendly container
+       without needing custom CSS. *@
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-2 p-sm-3">
+            
+
+            @* This form edits the summary fields.
+               The EditContext still allows PatientDetails.razor to detect when fields change. *@
+            <EditForm EditContext="SummaryEditContext">
+                <DataAnnotationsValidator />
+
+                @* Validation messages stay compact and close to the fields. *@
+                <ValidationSummary class="text-danger small mb-2" />
+
+                @* This field stores the main free-text clinical history and summary notes.
+                   form-control-sm reduces padding and makes the section feel lighter on mobile. *@
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold mb-1" for="combined-history">
+                        History, admission and progress
+                    </label>
+                    <InputTextArea id="combined-history"
+                                   class="form-control form-control-sm"
+                                   rows="24"
+                                   @bind-Value="Patient.PatientSummary!.CombinedHistory" />
+                </div>
+
+                @* This field stores reminders, plans, or tasks related to the patient. *@
+                <div class="mb-0">
+                    <label class="form-label small fw-semibold mb-1" for="events-todo">
+                        Tasks
+                    </label>
+                    <InputTextArea id="events-todo"
+                                   class="form-control form-control-sm"
+                                   rows="6"
+                                   @bind-Value="Patient.PatientSummary!.EventsTodo" />
+                </div>
+            </EditForm>
         </div>
-
-        @* This form edits the summary fields.
-           The EditContext still allows PatientDetails.razor to detect when fields change. *@
-        <EditForm EditContext="SummaryEditContext">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-
-            @* This field stores the main free-text clinical history and summary notes. *@
-            <div class="mb-3">
-                <label class="form-label">Combined History</label>
-                <InputTextArea class="form-control"
-                               rows="6"
-                               @bind-Value="Patient.PatientSummary!.CombinedHistory" />
-            </div>
-
-            @* This field stores reminders, plans, or tasks related to the patient. *@
-            <div class="mb-3">
-                <label class="form-label">To Do</label>
-                <InputTextArea class="form-control"
-                               rows="5"
-                               @bind-Value="Patient.PatientSummary!.EventsTodo" />
-            </div>
-        </EditForm>
     </div>
 }
 

@@ -3,32 +3,40 @@
 
 @* This component manages the shared medication catalog.
    It can be reused by Neurology, Cardiology, GIT, and other sections later. *@
-<div class="d-flex justify-content-end gap-2 mb-3">
-    @* This button opens the modal that adds a new medication to the shared catalog. *@
-    <button type="button"
-            class="btn btn-outline-secondary"
-            @onclick="OpenAddMedicationModal"
-            disabled="@IsBusy">
-        Add New Medication To Catalog
-    </button>
 
-    @* This button opens the modal that edits an existing medication in the shared catalog. *@
-    <button type="button"
-            class="btn btn-outline-secondary"
-            @onclick="OpenEditMedicationModal"
-            disabled="@IsBusy">
-        Edit Medication In Catalog
-    </button>
+@* The Add/Edit buttons are placed in a Bootstrap row with two equal columns.
+   d-grid makes each button fill its column, so the two buttons stay equal in width.
+   btn-sm keeps them compact and saves vertical space on mobile screens. *@
+<div class="row g-2 mb-2">
+    <div class="col-6 d-grid">
+        @* This button opens the modal that adds a new medication to the shared catalog. *@
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm py-2"
+                @onclick="OpenAddMedicationModal"
+                disabled="@IsBusy">
+            Add Medication
+        </button>
+    </div>
+
+    <div class="col-6 d-grid">
+        @* This button opens the modal that edits an existing medication in the shared catalog. *@
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm py-2"
+                @onclick="OpenEditMedicationModal"
+                disabled="@IsBusy">
+            Edit Medication
+        </button>
+    </div>
 </div>
 
 @* This modal lets the user create a new shared medication catalog item. *@
 @if (showAddMedicationModal)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add New Medication</h5>
+                <div class="modal-header py-2">
+                    <h6 class="modal-title mb-0">Add Medication</h6>
 
                     <button type="button"
                             class="btn-close"
@@ -37,41 +45,47 @@
                     </button>
                 </div>
 
-                <div class="modal-body">
+                <div class="modal-body p-2 p-sm-3">
                     @* This warning shows validation or service errors inside the add modal. *@
                     @if (!string.IsNullOrWhiteSpace(newMedicationErrorMessage))
                     {
-                        <div class="alert alert-warning">
+                        <div class="alert alert-warning py-2 mb-2">
                             @newMedicationErrorMessage
                         </div>
                     }
 
-                    <div class="mb-3">
-                        <label class="form-label">Medication Name</label>
-                        <InputText class="form-control"
+                    @* Floating labels keep the label and input in one compact block. *@
+                    <div class="form-floating mb-2">
+                        <InputText id="@($"{componentId}-new-medication-name")"
+                                   class="form-control"
+                                   placeholder=" "
                                    @bind-Value="newMedicationName" />
+                        <label for="@($"{componentId}-new-medication-name")">Medication Name</label>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Default Frequency</label>
-                        <InputText class="form-control"
+                    <div class="form-floating mb-1">
+                        <InputText id="@($"{componentId}-new-medication-frequency")"
+                                   class="form-control"
+                                   placeholder=" "
                                    @bind-Value="newMedicationFrequency" />
-                        <div class="form-text">
-                            Examples: mcg/kg/min, BD, TID, q8h
-                        </div>
+                        <label for="@($"{componentId}-new-medication-frequency")">Default Frequency</label>
+                    </div>
+
+                    <div class="form-text mb-2">
+                        Examples: mcg/kg/min, BD, TID, q8h
                     </div>
                 </div>
 
-                <div class="modal-footer">
+                <div class="modal-footer py-2">
                     <button type="button"
-                            class="btn btn-secondary"
+                            class="btn btn-secondary btn-sm"
                             @onclick="CloseAddMedicationModal"
                             disabled="@IsBusy">
                         Cancel
                     </button>
 
                     <button type="button"
-                            class="btn btn-primary"
+                            class="btn btn-primary btn-sm"
                             @onclick="SaveNewMedicationAsync"
                             disabled="@IsBusy">
                         @(IsBusy ? "Saving..." : "Save Medication")
@@ -86,10 +100,10 @@
 @if (showEditMedicationModal)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Medication</h5>
+                <div class="modal-header py-2">
+                    <h6 class="modal-title mb-0">Edit Medication</h6>
 
                     <button type="button"
                             class="btn-close"
@@ -98,26 +112,27 @@
                     </button>
                 </div>
 
-                <div class="modal-body">
+                <div class="modal-body p-2 p-sm-3">
                     @* This warning shows validation or service errors inside the edit modal. *@
                     @if (!string.IsNullOrWhiteSpace(editMedicationErrorMessage))
                     {
-                        <div class="alert alert-warning">
+                        <div class="alert alert-warning py-2 mb-2">
                             @editMedicationErrorMessage
                         </div>
                     }
 
                     @if (!Medications.Any())
                     {
-                        <div class="alert alert-light border mb-0">
+                        <div class="alert alert-light border py-2 mb-0">
                             No medications in the catalog yet.
                         </div>
                     }
                     else
                     {
-                        <div class="mb-3">
-                            <label class="form-label">Select Medication</label>
-                            <select class="form-select"
+                        @* The select also uses a floating label to keep the edit modal compact. *@
+                        <div class="form-floating mb-2">
+                            <select id="@($"{componentId}-selected-medication")"
+                                    class="form-select"
                                     value="@selectedMedicationToEditId"
                                     @onchange="OnSelectedMedicationToEditChanged">
                                 @foreach (var medication in Medications)
@@ -125,35 +140,41 @@
                                     <option value="@medication.Id">@medication.Name</option>
                                 }
                             </select>
+                            <label for="@($"{componentId}-selected-medication")">Select Medication</label>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Medication Name</label>
-                            <InputText class="form-control"
+                        <div class="form-floating mb-2">
+                            <InputText id="@($"{componentId}-edit-medication-name")"
+                                       class="form-control"
+                                       placeholder=" "
                                        @bind-Value="editMedicationName" />
+                            <label for="@($"{componentId}-edit-medication-name")">Medication Name</label>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Default Frequency</label>
-                            <InputText class="form-control"
+                        <div class="form-floating mb-1">
+                            <InputText id="@($"{componentId}-edit-medication-frequency")"
+                                       class="form-control"
+                                       placeholder=" "
                                        @bind-Value="editMedicationFrequency" />
-                            <div class="form-text">
-                                Examples: mcg/kg/min, BD, TID, q8h
-                            </div>
+                            <label for="@($"{componentId}-edit-medication-frequency")">Default Frequency</label>
+                        </div>
+
+                        <div class="form-text mb-2">
+                            Examples: mcg/kg/min, BD, TID, q8h
                         </div>
                     }
                 </div>
 
-                <div class="modal-footer">
+                <div class="modal-footer py-2">
                     <button type="button"
-                            class="btn btn-secondary"
+                            class="btn btn-secondary btn-sm"
                             @onclick="CloseEditMedicationModal"
                             disabled="@IsBusy">
                         Cancel
                     </button>
 
                     <button type="button"
-                            class="btn btn-primary"
+                            class="btn btn-primary btn-sm"
                             @onclick="SaveEditedMedicationAsync"
                             disabled="@IsBusy">
                         @(IsBusy ? "Saving..." : "Save Changes")
@@ -165,6 +186,10 @@
 }
 
 @code {
+    // This unique id prefix prevents duplicate HTML id values when this manager
+    // is used more than once on the same page, such as Sedation and Neuro Medications.
+    private readonly string componentId = $"medications-manager-{Guid.NewGuid():N}";
+
     // The parent passes the current shared medication list into this component.
     [Parameter, EditorRequired]
     public List<Medication> Medications { get; set; } = new();

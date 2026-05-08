@@ -11,198 +11,209 @@
    so the top of the page stays as clean as possible. *@
 @if (isLoading)
 {
-    <p>Loading patient details...</p>
+    <div class="alert alert-info py-2 px-3 small mb-2">
+        Loading patient details...
+    </div>
 }
 else if (patient is null)
 {
-    <div class="alert alert-warning">
+    <div class="alert alert-warning py-2 px-3 small mb-2">
         Patient not found.
     </div>
 
-    <a href="/patients" class="btn btn-secondary">Back to Patients</a>
+    <a href="/patients" class="btn btn-outline-secondary btn-sm">
+        Back to Patients
+    </a>
 }
 else
 {
-    <div class="card shadow-sm">
-        <div class="card-body p-2 p-sm-3">
+    @* Main page container.
 
-            @* Patient section tabs.
+       The child sections already use Bootstrap cards, so this parent page
+       avoids adding another large card around them. This saves vertical space
+       and prevents the mobile UI from feeling like cards inside cards.
+    *@
+    <div class="patient-details-page">
 
-               UI goals:
-               - Keep the tabs easy to reach while scrolling.
-               - Avoid horizontal page scrolling on mobile.
-               - Keep patient name and bed always visible.
-               - Use Bootstrap utilities as much as possible.
-               - Avoid JavaScript.
+        @* Patient section tabs.
 
-               The patient name and bed now live inside this sticky tab container.
-               This makes them visible while reviewing any section.
+           UI goals:
+           - Keep the tabs easy to reach while scrolling.
+           - Avoid horizontal page scrolling on mobile.
+           - Keep patient name and bed always visible.
+           - Use Bootstrap utilities as much as possible.
+           - Avoid JavaScript.
+
+           The patient name and bed live inside this sticky tab container.
+           This makes them visible while reviewing any section.
+        *@
+        <div class="position-sticky bg-white border rounded-3 shadow-sm p-2 mb-2"
+             style="top: calc(3rem + env(safe-area-inset-top)); z-index: 1010;">
+
+            @* Compact patient identity row.
+
+               The small text and rounded badge keep the header readable
+               without wasting vertical space on a phone.
             *@
-            <div class="position-sticky bg-white border rounded shadow-sm p-2 mb-3"
-                 style="top: calc(3rem + env(safe-area-inset-top)); z-index: 1010;">
+            <div class="d-flex align-items-center gap-2 mb-2 small">
+                <span class="fw-semibold text-truncate">
+                    @patient.Name
+                </span>
 
-                @* Compact patient identity row.
-
-                   This replaces the old larger patient header.
-                   It uses normal text size so it does not waste vertical space.
-                *@
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="fw-semibold text-truncate">
-                        @patient.Name
+                @if (!string.IsNullOrWhiteSpace(patient.Bed))
+                {
+                    <span class="badge rounded-pill bg-light text-dark border flex-shrink-0">
+                        Bed @patient.Bed
                     </span>
-
-                    @if (!string.IsNullOrWhiteSpace(patient.Bed))
-                    {
-                        <span class="badge bg-light text-dark border flex-shrink-0">
-                            Bed @patient.Bed
-                        </span>
-                    }
-                    else
-                    {
-                        <span class="badge bg-light text-muted border flex-shrink-0">
-                            No bed
-                        </span>
-                    }
-                </div>
-
-                @* Horizontally scrollable tabs.
-
-                   overflow-auto:
-                   Allows the tab row to scroll left/right on mobile.
-
-                   flex-nowrap:
-                   Prevents the tabs from wrapping into multiple lines.
-
-                   flex-shrink-0 in GetTabButtonClass:
-                   Prevents each tab from being squeezed too much.
-                *@
-                <div class="overflow-auto">
-                    <div class="nav nav-pills flex-nowrap gap-2"
-                         role="tablist"
-                         aria-label="Patient sections">
-
-                        <button type="button"
-                                class='@GetTabButtonClass("overview")'
-                                role="tab"
-                                aria-selected='@IsTabActive("overview")'
-                                @onclick='() => SelectTab("overview")'>
-                            <span>Overview</span>
-
-                            @if (isOverviewDirty || isTimelineDirty)
-                            {
-                                <span class="badge rounded-pill bg-warning text-dark ms-2">
-                                    @GetOverviewTabUnsavedText()
-                                </span>
-                            }
-                        </button>
-
-                        <button type="button"
-                                class='@GetTabButtonClass("summary")'
-                                role="tab"
-                                aria-selected='@IsTabActive("summary")'
-                                @onclick='() => SelectTab("summary")'>
-                            <span>Summary</span>
-
-                            @if (isSummaryDirty)
-                            {
-                                <span class="badge rounded-pill bg-warning text-dark ms-2">
-                                    Unsaved
-                                </span>
-                            }
-                        </button>
-
-                        <button type="button"
-                                class='@GetTabButtonClass("neurology")'
-                                role="tab"
-                                aria-selected='@IsTabActive("neurology")'
-                                @onclick='() => SelectTab("neurology")'>
-                            <span>Neurology</span>
-
-                            @if (isNeurologyDirty)
-                            {
-                                <span class="badge rounded-pill bg-warning text-dark ms-2">
-                                    Unsaved
-                                </span>
-                            }
-                        </button>
-
-                        <button type="button"
-                                class='@GetTabButtonClass("cardiology")'
-                                role="tab"
-                                aria-selected='@IsTabActive("cardiology")'
-                                @onclick='() => SelectTab("cardiology")'>
-                            <span>Cardiology</span>
-
-                            @if (isCardiologyDirty)
-                            {
-                                <span class="badge rounded-pill bg-warning text-dark ms-2">
-                                    Unsaved
-                                </span>
-                            }
-                        </button>
-
-                    </div>
-                </div>
+                }
+                else
+                {
+                    <span class="badge rounded-pill bg-light text-muted border flex-shrink-0">
+                        No bed
+                    </span>
+                }
             </div>
 
-            @* Render Overview through its own child component.
-               Overview also contains the timeline. *@
-            @if (activeTab == "overview")
-            {
-                <OverviewSection Patient="patient"
-                                 AdmissionUnits="admissionUnits"
-                                 OrderedDateEvents="orderedDateEvents"
-                                 OverviewEditContext="overviewEditContext!"
-                                 TimelineEditContext="timelineEditContext!"
-                                 IsSaving="isSaving"
-                                 OnAddTimelineEvent="AddTimelineEventCallbackAsync"
-                                 OnRemoveTimelineEvent="RemoveTimelineEventCallbackAsync" />
-            }
-            @* Render Summary through its own child component.
-               The parent page still owns save logic and dirty tracking. *@
-            else if (activeTab == "summary")
-            {
-                <SummarySection Patient="patient"
-                                SummaryEditContext="summaryEditContext!" />
-            }
-            @* Render Neurology through its own child component.
-               The parent page still owns save logic and dirty tracking. *@
-            else if (activeTab == "neurology")
-            {
-                <NeurologySection Patient="patient"
-                                  Medications="medications"
-                                  NeurologyEditContext="neurologyEditContext!"
-                                  IsSaving="isSaving"
-                                  OnAddNeurologyMedication="AddNeurologyMedication"
-                                  OnRemoveNeurologyMedication="RemoveNeurologyMedication"
-                                  OnMedicationsChanged="HandleMedicationsChangedAsync"
-                                  OnStatusMessage="HandleChildStatusMessageAsync" />
-            }
-            @* Render Cardiology through its own child component.
-               The parent page owns save logic, dirty tracking, reload,
-               and medication add/remove logic. *@
-            else if (activeTab == "cardiology")
-            {
-                <CardiologySection Patient="patient"
-                                   Medications="medications"
-                                   CardiologyEditContext="cardiologyEditContext!"
-                                   IsSaving="isSaving"
-                                   OnAddCardiologyMedication="AddCardiologyMedication"
-                                   OnRemoveCardiologyMedication="RemoveCardiologyMedication"
-                                   OnMedicationsChanged="HandleMedicationsChangedAsync"
-                                   OnStatusMessage="HandleChildStatusMessageAsync" />
-            }
+            @* Horizontally scrollable tabs.
 
-            <hr />
+               overflow-auto:
+               Allows the tab row to scroll left/right on mobile.
 
-            <div class="d-flex gap-2">
-                <a href="/patients" class="btn btn-secondary">Back</a>
+               flex-nowrap:
+               Prevents the tabs from wrapping into multiple lines.
+
+               flex-shrink-0 in GetTabButtonClass:
+               Prevents each tab from being squeezed too much.
+            *@
+            <div class="overflow-auto">
+                <div class="nav nav-pills flex-nowrap gap-1"
+                     role="tablist"
+                     aria-label="Patient sections">
+
+                    <button type="button"
+                            class='@GetTabButtonClass("overview")'
+                            role="tab"
+                            aria-selected='@IsTabActive("overview")'
+                            @onclick='() => SelectTab("overview")'>
+                        <span>Overview</span>
+
+                        @if (isOverviewDirty || isTimelineDirty)
+                        {
+                            <span class="badge rounded-pill bg-warning text-dark ms-1">
+                                @GetOverviewTabUnsavedText()
+                            </span>
+                        }
+                    </button>
+
+                    <button type="button"
+                            class='@GetTabButtonClass("summary")'
+                            role="tab"
+                            aria-selected='@IsTabActive("summary")'
+                            @onclick='() => SelectTab("summary")'>
+                        <span>Summary</span>
+
+                        @if (isSummaryDirty)
+                        {
+                            <span class="badge rounded-pill bg-warning text-dark ms-1">
+                                Unsaved
+                            </span>
+                        }
+                    </button>
+
+                    <button type="button"
+                            class='@GetTabButtonClass("neurology")'
+                            role="tab"
+                            aria-selected='@IsTabActive("neurology")'
+                            @onclick='() => SelectTab("neurology")'>
+                        <span>Neurology</span>
+
+                        @if (isNeurologyDirty)
+                        {
+                            <span class="badge rounded-pill bg-warning text-dark ms-1">
+                                Unsaved
+                            </span>
+                        }
+                    </button>
+
+                    <button type="button"
+                            class='@GetTabButtonClass("cardiology")'
+                            role="tab"
+                            aria-selected='@IsTabActive("cardiology")'
+                            @onclick='() => SelectTab("cardiology")'>
+                        <span>Cardiology</span>
+
+                        @if (isCardiologyDirty)
+                        {
+                            <span class="badge rounded-pill bg-warning text-dark ms-1">
+                                Unsaved
+                            </span>
+                        }
+                    </button>
+
+                </div>
             </div>
+        </div>
+
+        @* Render Overview through its own child component.
+           Overview also contains the timeline. *@
+        @if (activeTab == "overview")
+        {
+            <OverviewSection Patient="patient"
+                             AdmissionUnits="admissionUnits"
+                             OrderedDateEvents="orderedDateEvents"
+                             OverviewEditContext="overviewEditContext!"
+                             TimelineEditContext="timelineEditContext!"
+                             IsSaving="isSaving"
+                             OnAddTimelineEvent="AddTimelineEventCallbackAsync"
+                             OnRemoveTimelineEvent="RemoveTimelineEventCallbackAsync" />
+        }
+        @* Render Summary through its own child component.
+           The parent page still owns save logic and dirty tracking. *@
+        else if (activeTab == "summary")
+        {
+            <SummarySection Patient="patient"
+                            SummaryEditContext="summaryEditContext!" />
+        }
+        @* Render Neurology through its own child component.
+           The parent page still owns save logic and dirty tracking. *@
+        else if (activeTab == "neurology")
+        {
+            <NeurologySection Patient="patient"
+                              Medications="medications"
+                              NeurologyEditContext="neurologyEditContext!"
+                              IsSaving="isSaving"
+                              OnAddNeurologyMedication="AddNeurologyMedication"
+                              OnRemoveNeurologyMedication="RemoveNeurologyMedication"
+                              OnMedicationsChanged="HandleMedicationsChangedAsync"
+                              OnStatusMessage="HandleChildStatusMessageAsync" />
+        }
+        @* Render Cardiology through its own child component.
+           The parent page owns save logic, dirty tracking, reload,
+           and medication add/remove logic. *@
+        else if (activeTab == "cardiology")
+        {
+            <CardiologySection Patient="patient"
+                               Medications="medications"
+                               CardiologyEditContext="cardiologyEditContext!"
+                               IsSaving="isSaving"
+                               OnAddCardiologyMedication="AddCardiologyMedication"
+                               OnRemoveCardiologyMedication="RemoveCardiologyMedication"
+                               OnMedicationsChanged="HandleMedicationsChangedAsync"
+                               OnStatusMessage="HandleChildStatusMessageAsync" />
+        }
+
+        @* Small navigation button.
+           It stays outside the fixed Save/Reload bar because the bottom bar
+           should only handle the currently active section. *@
+        <div class="mt-2">
+            <a href="/patients" class="btn btn-outline-secondary btn-sm">
+                Back to Patients
+            </a>
         </div>
     </div>
 
     @* This spacer prevents the fixed bottom bar from covering the bottom of the page content. *@
-    <div class="patient-details-bottom-spacer"></div>
+    <div class="patient-details-bottom-spacer" aria-hidden="true"></div>
 
     @* Fixed bottom action bar.
 
@@ -210,35 +221,37 @@ else
        The section components do not need their own Save/Reload buttons anymore.
     *@
     <div class="fixed-bottom patient-details-action-bar bg-white border-top shadow-sm">
-        <div class="container-fluid">
-            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2">
-                <div>
-                    <div class="@GetActiveSectionStatusCssClass()">
-                        @GetActiveSectionStatusText()
-                    </div>
+        <div class="container-fluid px-2 px-sm-3">
+            <div class="d-flex flex-column gap-2">
+                <div class="@GetActiveSectionStatusCssClass() text-truncate">
+                    @GetActiveSectionStatusText()
                 </div>
 
-                <div class="d-flex gap-2">
-                    <button type="button"
-                            class="btn btn-outline-secondary flex-fill flex-sm-grow-0"
-                            disabled="@isSaving"
-                            @onclick="ReloadPatientAsync">
-                        Reload
-                    </button>
+                <div class="row g-2">
+                    <div class="col-5 col-sm-auto">
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm w-100"
+                                disabled="@isSaving"
+                                @onclick="ReloadPatientAsync">
+                            Reload
+                        </button>
+                    </div>
 
-                    <button type="button"
-                            class="btn btn-primary flex-fill flex-sm-grow-0"
-                            disabled="@(isSaving || !IsActiveSectionDirty())"
-                            @onclick="SaveActiveSectionAsync">
-                        @if (isSaving)
-                        {
-                            <span>Saving...</span>
-                        }
-                        else
-                        {
-                            <span>Save @GetActiveSectionName()</span>
-                        }
-                    </button>
+                    <div class="col-7 col-sm-auto">
+                        <button type="button"
+                                class="btn btn-primary btn-sm w-100"
+                                disabled="@(isSaving || !IsActiveSectionDirty())"
+                                @onclick="SaveActiveSectionAsync">
+                            @if (isSaving)
+                            {
+                                <span>Saving...</span>
+                            }
+                            else
+                            {
+                                <span>Save @GetActiveSectionName()</span>
+                            }
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -246,21 +259,22 @@ else
 }
 
 <style>
-    /* The fixed action bar sits at the bottom of the screen.
-           It uses mostly Bootstrap classes in the markup.
-           These small CSS rules only handle spacing and mobile safe-area padding. */
+    /* The fixed action bar uses Bootstrap for layout and styling.
+           These small CSS rules only handle safe-area padding and the spacer
+           needed because the bar is fixed to the bottom of the screen. */
     .patient-details-action-bar {
         z-index: 1030;
-        padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+        padding-top: 0.5rem;
+        padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
     }
 
     .patient-details-bottom-spacer {
-        height: 95px;
+        height: 88px;
     }
 
     @@media (max-width: 575.98px) {
         .patient-details-bottom-spacer {
-            height: 130px;
+            height: 108px;
         }
     }
 </style>
@@ -769,8 +783,8 @@ else
             Bootstrap uses this class to highlight the selected nav-link.
         */
         return activeTab == tabName
-            ? "nav-link active text-nowrap flex-shrink-0"
-            : "nav-link text-nowrap flex-shrink-0";
+            ? "nav-link active text-nowrap flex-shrink-0 py-1 px-2 small"
+            : "nav-link text-nowrap flex-shrink-0 py-1 px-2 small";
     }
 
     private bool IsTabActive(string tabName)
