@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace IcuNotes.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class RecreateEverything : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -130,6 +130,31 @@ namespace IcuNotes.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "GastroIntestinals",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    PatientId = table.Column<int>(type: "INTEGER", nullable: false),
+                    FeedingRoute = table.Column<string>(type: "TEXT", maxLength: 30, nullable: false),
+                    LastBowelMotionDate = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    IntraAbdominalPressure = table.Column<int>(type: "INTEGER", nullable: true),
+                    AbdominalGirth = table.Column<int>(type: "INTEGER", nullable: true),
+                    HasGiBleeding = table.Column<bool>(type: "INTEGER", nullable: false),
+                    GitNotes = table.Column<string>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_GastroIntestinals", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_GastroIntestinals_Patients_PatientId",
+                        column: x => x.PatientId,
+                        principalTable: "Patients",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Neurologies",
                 columns: table => new
                 {
@@ -224,6 +249,34 @@ namespace IcuNotes.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "GastroIntestinalItems",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    GastroIntestinalId = table.Column<int>(type: "INTEGER", nullable: false),
+                    MedicationId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Category = table.Column<int>(type: "INTEGER", nullable: false),
+                    DoseOrRate = table.Column<decimal>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_GastroIntestinalItems", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_GastroIntestinalItems_GastroIntestinals_GastroIntestinalId",
+                        column: x => x.GastroIntestinalId,
+                        principalTable: "GastroIntestinals",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_GastroIntestinalItems_Medications_MedicationId",
+                        column: x => x.MedicationId,
+                        principalTable: "Medications",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "NeurologyMedications",
                 columns: table => new
                 {
@@ -271,6 +324,22 @@ namespace IcuNotes.Migrations
                 name: "IX_CardiologyMedications_MedicationId",
                 table: "CardiologyMedications",
                 column: "MedicationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_GastroIntestinalItems_GastroIntestinalId",
+                table: "GastroIntestinalItems",
+                column: "GastroIntestinalId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_GastroIntestinalItems_MedicationId",
+                table: "GastroIntestinalItems",
+                column: "MedicationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_GastroIntestinals_PatientId",
+                table: "GastroIntestinals",
+                column: "PatientId",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Medications_Name",
@@ -321,6 +390,9 @@ namespace IcuNotes.Migrations
                 name: "CardiologyMedications");
 
             migrationBuilder.DropTable(
+                name: "GastroIntestinalItems");
+
+            migrationBuilder.DropTable(
                 name: "NeurologyMedications");
 
             migrationBuilder.DropTable(
@@ -334,6 +406,9 @@ namespace IcuNotes.Migrations
 
             migrationBuilder.DropTable(
                 name: "Cardiologies");
+
+            migrationBuilder.DropTable(
+                name: "GastroIntestinals");
 
             migrationBuilder.DropTable(
                 name: "Medications");

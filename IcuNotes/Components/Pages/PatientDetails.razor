@@ -150,6 +150,21 @@ else
                         }
                     </button>
 
+                    <button type="button"
+                            class='@GetTabButtonClass("gastrointestinal")'
+                            role="tab"
+                            aria-selected='@IsTabActive("gastrointestinal")'
+                            @onclick='() => SelectTab("gastrointestinal")'>
+                        <span>GIT</span>
+
+                        @if (isGastroIntestinalDirty)
+                        {
+                            <span class="badge rounded-pill bg-warning text-dark ms-1">
+                                Unsaved
+                            </span>
+                        }
+                    </button>
+
                 </div>
             </div>
         </div>
@@ -200,6 +215,20 @@ else
                                OnRemoveCardiologyMedication="RemoveCardiologyMedication"
                                OnMedicationsChanged="HandleMedicationsChangedAsync"
                                OnStatusMessage="HandleChildStatusMessageAsync" />
+        }
+        @* Render GIT through its own child component.
+           The parent page still owns save logic, dirty tracking, reload,
+           and formula / IV fluid / medication row add-remove logic. *@
+        else if (activeTab == "gastrointestinal")
+        {
+            <GastroIntestinalSection Patient="patient"
+                                     Medications="medications"
+                                     GastroIntestinalEditContext="gastroIntestinalEditContext!"
+                                     IsSaving="isSaving"
+                                     OnAddGastroIntestinalItem="AddGastroIntestinalItem"
+                                     OnRemoveGastroIntestinalItem="RemoveGastroIntestinalItem"
+                                     OnMedicationsChanged="HandleMedicationsChangedAsync"
+                                     OnStatusMessage="HandleChildStatusMessageAsync" />
         }
 
         @* Small navigation button.
@@ -260,8 +289,8 @@ else
 
 <style>
     /* The fixed action bar uses Bootstrap for layout and styling.
-           These small CSS rules only handle safe-area padding and the spacer
-           needed because the bar is fixed to the bottom of the screen. */
+                   These small CSS rules only handle safe-area padding and the spacer
+                   needed because the bar is fixed to the bottom of the screen. */
     .patient-details-action-bar {
         z-index: 1030;
         padding-top: 0.5rem;
@@ -301,6 +330,7 @@ else
     private bool isTimelineDirty;
     private bool isNeurologyDirty;
     private bool isCardiologyDirty;
+    private bool isGastroIntestinalDirty;
 
     // Separate EditContexts let us know which section changed.
     // Each section has its own EditContext so we can show the correct Unsaved badge.
@@ -309,6 +339,7 @@ else
     private EditContext? timelineEditContext;
     private EditContext? neurologyEditContext;
     private EditContext? cardiologyEditContext;
+    private EditContext? gastroIntestinalEditContext;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -370,6 +401,13 @@ else
 
         patient.Cardiology.Medications ??= new List<CardiologyMedication>();
 
+        patient.GastroIntestinal ??= new GastroIntestinal
+        {
+            PatientId = patient.Id
+        };
+
+        patient.GastroIntestinal.Items ??= new List<GastroIntestinalItem>();
+
         orderedDateEvents = patient.PatientDateEvents
             .OrderBy(e => e.EventDate)
             .ToList();
@@ -400,6 +438,9 @@ else
 
         cardiologyEditContext = new EditContext(patient.Cardiology!);
         cardiologyEditContext.OnFieldChanged += HandleCardiologyFieldChanged;
+
+        gastroIntestinalEditContext = new EditContext(patient.GastroIntestinal!);
+        gastroIntestinalEditContext.OnFieldChanged += HandleGastroIntestinalFieldChanged;
     }
 
     private void HandleOverviewFieldChanged(object? sender, FieldChangedEventArgs e)
@@ -432,6 +473,12 @@ else
         InvokeAsync(StateHasChanged);
     }
 
+    private void HandleGastroIntestinalFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        isGastroIntestinalDirty = true;
+        InvokeAsync(StateHasChanged);
+    }
+
     private void ResetDirtyFlags()
     {
         isOverviewDirty = false;
@@ -439,6 +486,7 @@ else
         isTimelineDirty = false;
         isNeurologyDirty = false;
         isCardiologyDirty = false;
+        isGastroIntestinalDirty = false;
     }
 
     private async Task SaveOverviewAsync()
@@ -627,6 +675,52 @@ else
         }
     }
 
+    private async Task SaveGastroIntestinalAsync()
+    {
+        if (patient is null)
+            return;
+
+        try
+        {
+            isSaving = true;
+
+            // Make sure the GIT section exists and is linked to this patient.
+            patient.GastroIntestinal ??= new GastroIntestinal
+            {
+                PatientId = patient.Id
+            };
+
+            patient.GastroIntestinal.PatientId = patient.Id;
+            patient.GastroIntestinal.Items ??= new List<GastroIntestinalItem>();
+
+            await PatientService.UpdateAsync(patient);
+
+            // Reload after save so new formula, IV fluid, and medication rows
+            // get real database Ids and refreshed catalog navigation properties.
+            patient = await PatientService.GetByIdAsync(Id);
+
+            if (patient is not null)
+            {
+                EnsurePatientChildObjects();
+                CreateEditContexts();
+            }
+
+            isGastroIntestinalDirty = false;
+
+            statusMessage = "GIT saved successfully.";
+            statusCssClass = "alert-success";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error while saving GIT: {ex.Message}";
+            statusCssClass = "alert-danger";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
     // This small wrapper lets the child Overview component ask the parent page
     // to add a new timeline row while keeping the actual logic in this file.
     private Task AddTimelineEventCallbackAsync()
@@ -733,6 +827,38 @@ else
         isCardiologyDirty = true;
     }
 
+    private void AddGastroIntestinalItem(GastroIntestinalItemCategory category)
+    {
+        if (patient is null)
+            return;
+
+        patient.GastroIntestinal ??= new GastroIntestinal
+        {
+            PatientId = patient.Id
+        };
+
+        patient.GastroIntestinal.Items ??= new List<GastroIntestinalItem>();
+
+        patient.GastroIntestinal.Items.Add(new GastroIntestinalItem
+        {
+            Category = category
+        });
+
+        CreateEditContexts();
+        isGastroIntestinalDirty = true;
+    }
+
+    private void RemoveGastroIntestinalItem(GastroIntestinalItem item)
+    {
+        if (patient?.GastroIntestinal is null)
+            return;
+
+        patient.GastroIntestinal.Items.Remove(item);
+
+        CreateEditContexts();
+        isGastroIntestinalDirty = true;
+    }
+
     // This method lets the shared MedicationsManager replace the parent page medication list
     // after adding or editing a catalog item.
     private Task HandleMedicationsChangedAsync(List<Medication> refreshedMedications)
@@ -817,6 +943,7 @@ else
             "summary" => "Summary",
             "neurology" => "Neurology",
             "cardiology" => "Cardiology",
+            "gastrointestinal" => "GIT",
             _ => "Section"
         };
     }
@@ -832,6 +959,7 @@ else
             "summary" => isSummaryDirty,
             "neurology" => isNeurologyDirty,
             "cardiology" => isCardiologyDirty,
+            "gastrointestinal" => isGastroIntestinalDirty,
             _ => false
         };
     }
@@ -940,6 +1068,10 @@ else
             case "cardiology":
                 await SaveCardiologyAsync();
                 break;
+
+            case "gastrointestinal":
+                await SaveGastroIntestinalAsync();
+                break;
         }
     }
 
@@ -959,6 +1091,9 @@ else
 
         if (cardiologyEditContext is not null)
             cardiologyEditContext.OnFieldChanged -= HandleCardiologyFieldChanged;
+
+        if (gastroIntestinalEditContext is not null)
+            gastroIntestinalEditContext.OnFieldChanged -= HandleGastroIntestinalFieldChanged;
     }
 
     public void Dispose()

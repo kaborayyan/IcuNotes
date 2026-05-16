@@ -33,7 +33,6 @@ namespace IcuNotes
             // Example:
             // builder.Services.AddScoped<PatientService>();
             builder.Services.AddSingleton<PatientService>();
-            builder.Services.AddSingleton<PatientDraftService>();
 
             builder.Services.AddMauiBlazorWebView();
 

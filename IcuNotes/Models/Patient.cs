@@ -54,6 +54,10 @@ namespace IcuNotes.Models
         // A patient can have one cardiology record.
         public Cardiology? Cardiology { get; set; }
 
+        // One-to-one navigation property.
+        // A patient can have one gastrointestinal tract record.
+        public GastroIntestinal? GastroIntestinal { get; set; }
+
         // One-to-many navigation property.
         // A patient can have many dated events in the timeline.
         public List<PatientDateEvent> PatientDateEvents { get; set; } = new();

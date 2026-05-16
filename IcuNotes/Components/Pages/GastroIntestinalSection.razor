@@ -1,0 +1,522 @@
+﻿@using IcuNotes.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Runtime.CompilerServices
+
+@* This component contains the Gastrointestinal Tract section UI.
+   It uses Bootstrap for a compact mobile layout and avoids JavaScript.
+   The parent PatientDetails page still owns saving, reloading, and dirty tracking. *@
+@if (Patient?.GastroIntestinal is not null)
+{
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-2 p-sm-3">
+            <div class="mb-2">
+                <h6 class="mb-0">GIT</h6>
+                <div class="form-text small">
+                    Gastrointestinal tract, feeding, fluids, abdomen, and related medications.
+                </div>
+            </div>
+
+            @* This form edits the GIT section fields.
+               The fixed bottom bar in PatientDetails handles Save and Reload. *@
+            <EditForm EditContext="GastroIntestinalEditContext">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                @* Basic GIT fields. *@
+                <div class="card mb-2">
+                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
+                        <h6 class="mb-0">Assessment</h6>
+                    </div>
+
+                    <div class="card-body p-2 p-sm-3">
+                        <div class="row g-2">
+                            <div class="col-12 col-sm-6 col-md-4">
+                                <div class="form-floating">
+                                    <InputSelect class="form-select"
+                                                 @bind-Value="Patient.GastroIntestinal.FeedingRoute">
+                                        @foreach (var route in FeedingRouteOptions)
+                                        {
+                                            <option value="@route">@route</option>
+                                        }
+                                    </InputSelect>
+                                    <label>Feeding route</label>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-sm-6 col-md-4">
+                                <div class="form-floating">
+                                    <InputDate TValue="DateTime?"
+                                               class="form-control"
+                                               placeholder=" "
+                                               @bind-Value="Patient.GastroIntestinal.LastBowelMotionDate" />
+                                    <label>Last bowel motion</label>
+                                </div>
+                            </div>
+
+                            <div class="col-6 col-md-2">
+                                <div class="form-floating">
+                                    <InputNumber TValue="int?"
+                                                 class="form-control"
+                                                 placeholder=" "
+                                                 @bind-Value="Patient.GastroIntestinal.IntraAbdominalPressure" />
+                                    <label>IAP</label>
+                                </div>
+                                <div class="form-text small">mmHg</div>
+                            </div>
+
+                            <div class="col-6 col-md-2">
+                                <div class="form-floating">
+                                    <InputNumber TValue="int?"
+                                                 class="form-control"
+                                                 placeholder=" "
+                                                 @bind-Value="Patient.GastroIntestinal.AbdominalGirth" />
+                                    <label>Girth</label>
+                                </div>
+                                <div class="form-text small">cm</div>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="form-check form-switch border rounded px-5 py-2 mb-0">
+                                    <InputCheckbox class="form-check-input"
+                                                   role="switch"
+                                                   @bind-Value="Patient.GastroIntestinal.HasGiBleeding" />
+                                    <label class="form-check-label fw-semibold">
+                                        GI bleeding
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    <InputTextArea class="form-control"
+                                                   placeholder=" "
+                                                   style="height: 7rem"
+                                                   @bind-Value="Patient.GastroIntestinal.GitNotes" />
+                                    <label>GIT notes</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @* This reusable manager handles adding and editing shared catalog items.
+                   We are using the same catalog for formulas, IV fluids, and medications. *@
+                <MedicationsManager Medications="Medications"
+                                    IsDisabled="IsSaving"
+                                    OnMedicationsChanged="HandleMedicationsChangedAsync"
+                                    OnStatusMessage="HandleStatusMessageAsync" />
+
+                @* Formula rows. Each row uses a Blazor-only searchable picker. *@
+                <div class="card mb-2">
+                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
+                        <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2">
+                            <h6 class="mb-0">Formula</h6>
+
+                            <div class="d-grid d-sm-block">
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm"
+                                        @onclick="() => HandleAddGastroIntestinalItemAsync(GastroIntestinalItemCategory.Formula)"
+                                        disabled="@IsSaving">
+                                    Add Formula
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-2 p-sm-3">
+                        @if (GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.Formula).Any())
+                        {
+                            @foreach (var item in GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.Formula))
+                            {
+                                <div class="border rounded p-2 mb-2" @key="item">
+                                    <div class="row g-2 align-items-stretch">
+                                        <div class="col-12 col-md-7">
+                                            @RenderSearchableCatalogPicker(item, "Search formula...")
+                                        </div>
+
+                                        <div class="col-7 col-md-3">
+                                            <div class="form-floating">
+                                                <InputNumber TValue="decimal?"
+                                                             class="form-control"
+                                                             placeholder=" "
+                                                             @bind-Value="item.DoseOrRate" />
+                                                <label>Rate ml/hr</label>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-5 col-md-2 d-grid">
+                                            <button type="button"
+                                                    class="btn btn-outline-danger btn-sm h-100"
+                                                    @onclick="() => HandleRemoveGastroIntestinalItemAsync(item)"
+                                                    disabled="@IsSaving">
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="alert alert-light border py-2 px-2 mb-0 small">
+                                No formula rows added yet.
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @* IV fluid rows. These also use the shared catalog and the same searchable picker. *@
+                <div class="card mb-2">
+                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
+                        <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2">
+                            <h6 class="mb-0">IV Fluids</h6>
+
+                            <div class="d-grid d-sm-block">
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm"
+                                        @onclick="() => HandleAddGastroIntestinalItemAsync(GastroIntestinalItemCategory.IVFluid)"
+                                        disabled="@IsSaving">
+                                    Add IV Fluid
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-2 p-sm-3">
+                        @if (GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.IVFluid).Any())
+                        {
+                            @foreach (var item in GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.IVFluid))
+                            {
+                                <div class="border rounded p-2 mb-2" @key="item">
+                                    <div class="row g-2 align-items-stretch">
+                                        <div class="col-12 col-md-7">
+                                            @RenderSearchableCatalogPicker(item, "Search IV fluid...")
+                                        </div>
+
+                                        <div class="col-7 col-md-3">
+                                            <div class="form-floating">
+                                                <InputNumber TValue="decimal?"
+                                                             class="form-control"
+                                                             placeholder=" "
+                                                             @bind-Value="item.DoseOrRate" />
+                                                <label>Rate ml/hr</label>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-5 col-md-2 d-grid">
+                                            <button type="button"
+                                                    class="btn btn-outline-danger btn-sm h-100"
+                                                    @onclick="() => HandleRemoveGastroIntestinalItemAsync(item)"
+                                                    disabled="@IsSaving">
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="alert alert-light border py-2 px-2 mb-0 small">
+                                No IV fluid rows added yet.
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @* Other GIT medication rows. These rows store patient-specific doses. *@
+                <div class="card mb-0">
+                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
+                        <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2">
+                            <h6 class="mb-0">Other GIT Medications</h6>
+
+                            <div class="d-grid d-sm-block">
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm"
+                                        @onclick="() => HandleAddGastroIntestinalItemAsync(GastroIntestinalItemCategory.OtherMedication)"
+                                        disabled="@IsSaving">
+                                    Add Medication
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-2 p-sm-3">
+                        @if (GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.OtherMedication).Any())
+                        {
+                            @foreach (var item in GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.OtherMedication))
+                            {
+                                <div class="border rounded p-2 mb-2" @key="item">
+                                    <div class="row g-2 align-items-stretch">
+                                        <div class="col-12 col-md-7">
+                                            @RenderSearchableCatalogPicker(item, "Search medication...")
+                                        </div>
+
+                                        <div class="col-7 col-md-3">
+                                            <div class="form-floating">
+                                                <InputNumber TValue="decimal?"
+                                                             class="form-control"
+                                                             placeholder=" "
+                                                             @bind-Value="item.DoseOrRate" />
+                                                <label>Dose</label>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-5 col-md-2 d-grid">
+                                            <button type="button"
+                                                    class="btn btn-outline-danger btn-sm h-100"
+                                                    @onclick="() => HandleRemoveGastroIntestinalItemAsync(item)"
+                                                    disabled="@IsSaving">
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="alert alert-light border py-2 px-2 mb-0 small">
+                                No other GIT medications added yet.
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @* Save and reload buttons are intentionally not here.
+                   PatientDetails shows them in the fixed bottom bar. *@
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    // The parent page passes the current patient object into this component.
+    [Parameter, EditorRequired]
+    public Patient? Patient { get; set; }
+
+    // The parent page passes the reusable medication catalog.
+    // This catalog is reused for formulas, IV fluids, and medications.
+    [Parameter, EditorRequired]
+    public List<Medication> Medications { get; set; } = new();
+
+    // The parent page passes the EditContext so dirty tracking stays in one place.
+    [Parameter, EditorRequired]
+    public EditContext GastroIntestinalEditContext { get; set; } = default!;
+
+    // This flag disables buttons while the parent page is saving data.
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    // The parent page provides the method that adds a new GIT row.
+    [Parameter, EditorRequired]
+    public EventCallback<GastroIntestinalItemCategory> OnAddGastroIntestinalItem { get; set; }
+
+    // The parent page provides the method that removes a GIT row.
+    [Parameter, EditorRequired]
+    public EventCallback<GastroIntestinalItem> OnRemoveGastroIntestinalItem { get; set; }
+
+    // This callback lets the parent page replace its medication catalog list
+    // after MedicationsManager adds or edits a catalog item.
+    [Parameter]
+    public EventCallback<List<Medication>> OnMedicationsChanged { get; set; }
+
+    // This callback lets the component forward status messages to the parent page.
+    [Parameter]
+    public EventCallback<string> OnStatusMessage { get; set; }
+
+    // Fixed route choices requested by the user.
+    // They are kept in the UI, not as a database enum.
+    private static readonly string[] FeedingRouteOptions =
+    {
+        "Not inserted",
+        "Oral",
+        "NGT",
+        "NJT",
+        "OGT",
+        "PEG"
+    };
+
+    // Each row can have its own search text.
+    // The key is stable for saved rows by database Id and stable for new rows by object reference.
+    private readonly Dictionary<string, string> searchTextByItemKey = new();
+
+    // This method asks the parent page to add a new formula, IV fluid, or medication row.
+    private async Task HandleAddGastroIntestinalItemAsync(GastroIntestinalItemCategory category)
+    {
+        await OnAddGastroIntestinalItem.InvokeAsync(category);
+    }
+
+    // This method asks the parent page to remove one GIT row.
+    private async Task HandleRemoveGastroIntestinalItemAsync(GastroIntestinalItem item)
+    {
+        searchTextByItemKey.Remove(GetItemKey(item));
+        await OnRemoveGastroIntestinalItem.InvokeAsync(item);
+    }
+
+    // This method receives the refreshed medication catalog from MedicationsManager.
+    // It updates this component and then informs the parent page too.
+    private async Task HandleMedicationsChangedAsync(List<Medication> refreshedMedications)
+    {
+        Medications = refreshedMedications ?? new List<Medication>();
+        await OnMedicationsChanged.InvokeAsync(Medications);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // This method forwards success messages from MedicationsManager to PatientDetails.
+    private async Task HandleStatusMessageAsync(string message)
+    {
+        await OnStatusMessage.InvokeAsync(message);
+    }
+
+    // This helper returns only one visible group of GIT rows at a time.
+    private IEnumerable<GastroIntestinalItem> GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory category)
+    {
+        if (Patient?.GastroIntestinal?.Items is null)
+            return Enumerable.Empty<GastroIntestinalItem>();
+
+        return Patient.GastroIntestinal.Items
+            .Where(x => x.Category == category)
+            .ToList();
+    }
+
+    // This is the Blazor-only searchable picker used by formula, IV fluid,
+    // and other medication rows.
+    private RenderFragment RenderSearchableCatalogPicker(GastroIntestinalItem item, string placeholder) => @<div>
+        @if (item.MedicationId > 0)
+        {
+            <div class="alert alert-light border py-1 px-2 mb-2 small d-flex justify-content-between align-items-center gap-2">
+                <span>
+                    <span class="fw-semibold">Selected:</span>
+                    @GetMedicationName(item.MedicationId)
+                </span>
+
+                @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                {
+                    <span class="text-muted text-nowrap">
+                        @GetMedicationFrequency(item.MedicationId)
+                    </span>
+                }
+            </div>
+        }
+
+        <input type="search"
+               class="form-control form-control-sm"
+               placeholder="@placeholder"
+               value="@GetSearchText(item)"
+               disabled="@IsSaving"
+               @oninput="e => SetSearchText(item, e.Value?.ToString())" />
+
+        @if (ShouldShowSearchResults(item))
+        {
+            <div class="list-group mt-1">
+                @foreach (var medication in GetFilteredMedications(item))
+                {
+                    <button type="button"
+                            class="list-group-item list-group-item-action py-2 px-2 small @(item.MedicationId == medication.Id ? "active" : string.Empty)"
+                            @onclick="() => SelectMedicationForItemAsync(item, medication)"
+                            disabled="@IsSaving">
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <span>@medication.Name</span>
+
+                            @if (!string.IsNullOrWhiteSpace(medication.Frequency))
+                            {
+                                <span class="small opacity-75 text-nowrap">@medication.Frequency</span>
+                            }
+                        </div>
+                    </button>
+                }
+            </div>
+        }
+        else if (item.MedicationId <= 0)
+        {
+            <div class="form-text small">
+                Type to search the medication catalog.
+            </div>
+        }
+    </div>;
+
+    // Store the current search text for a row.
+    private void SetSearchText(GastroIntestinalItem item, string? value)
+    {
+        searchTextByItemKey[GetItemKey(item)] = value ?? string.Empty;
+    }
+
+    // Return the current search text for a row.
+    private string GetSearchText(GastroIntestinalItem item)
+    {
+        return searchTextByItemKey.TryGetValue(GetItemKey(item), out var value)
+            ? value
+            : string.Empty;
+    }
+
+    // Search results should only appear after the user starts typing.
+    private bool ShouldShowSearchResults(GastroIntestinalItem item)
+    {
+        return !string.IsNullOrWhiteSpace(GetSearchText(item)) && GetFilteredMedications(item).Any();
+    }
+
+    // Filter the shared catalog by name.
+    // We limit the result count so the mobile screen does not become too crowded.
+    private IEnumerable<Medication> GetFilteredMedications(GastroIntestinalItem item)
+    {
+        var searchText = GetSearchText(item).Trim();
+
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Enumerable.Empty<Medication>();
+
+        return Medications
+            .Where(m => !string.IsNullOrWhiteSpace(m.Name) &&
+                        m.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(m => m.Name)
+            .Take(8)
+            .ToList();
+    }
+
+    // Select the exact catalog item by Id.
+    // This is the main advantage over datalist: we do not guess by typed text.
+    private async Task SelectMedicationForItemAsync(GastroIntestinalItem item, Medication medication)
+    {
+        item.MedicationId = medication.Id;
+        item.Medication = medication;
+
+        searchTextByItemKey[GetItemKey(item)] = string.Empty;
+
+        // Tell the parent EditContext that this row changed.
+        // This activates the Unsaved badge and fixed bottom Save button behavior.
+        GastroIntestinalEditContext.NotifyFieldChanged(
+            new FieldIdentifier(item, nameof(item.MedicationId)));
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // Look up the selected catalog item name.
+    private string GetMedicationName(int medicationId)
+    {
+        if (medicationId <= 0)
+            return "Not selected";
+
+        return Medications
+            .FirstOrDefault(x => x.Id == medicationId)
+            ?.Name ?? "Selected catalog item";
+    }
+
+    // Look up the optional default frequency text from the catalog.
+    private string? GetMedicationFrequency(int medicationId)
+    {
+        if (medicationId <= 0)
+            return null;
+
+        return Medications
+            .FirstOrDefault(x => x.Id == medicationId)
+            ?.Frequency;
+    }
+
+    // This gives each row a stable key for its search box text.
+    private static string GetItemKey(GastroIntestinalItem item)
+    {
+        return item.Id > 0
+            ? $"saved-{item.Id}"
+            : $"new-{RuntimeHelpers.GetHashCode(item)}";
+    }
+}

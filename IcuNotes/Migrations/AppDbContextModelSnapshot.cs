@@ -160,6 +160,70 @@ namespace IcuNotes.Migrations
                     b.ToTable("CardiologyMedications");
                 });
 
+            modelBuilder.Entity("IcuNotes.Models.GastroIntestinal", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("AbdominalGirth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FeedingRoute")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("GitNotes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("HasGiBleeding")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("IntraAbdominalPressure")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LastBowelMotionDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatientId")
+                        .IsUnique();
+
+                    b.ToTable("GastroIntestinals");
+                });
+
+            modelBuilder.Entity("IcuNotes.Models.GastroIntestinalItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("DoseOrRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("GastroIntestinalId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MedicationId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GastroIntestinalId");
+
+                    b.HasIndex("MedicationId");
+
+                    b.ToTable("GastroIntestinalItems");
+                });
+
             modelBuilder.Entity("IcuNotes.Models.Medication", b =>
                 {
                     b.Property<int>("Id")
@@ -368,6 +432,36 @@ namespace IcuNotes.Migrations
                     b.Navigation("Medication");
                 });
 
+            modelBuilder.Entity("IcuNotes.Models.GastroIntestinal", b =>
+                {
+                    b.HasOne("IcuNotes.Models.Patient", "Patient")
+                        .WithOne("GastroIntestinal")
+                        .HasForeignKey("IcuNotes.Models.GastroIntestinal", "PatientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("IcuNotes.Models.GastroIntestinalItem", b =>
+                {
+                    b.HasOne("IcuNotes.Models.GastroIntestinal", "GastroIntestinal")
+                        .WithMany("Items")
+                        .HasForeignKey("GastroIntestinalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IcuNotes.Models.Medication", "Medication")
+                        .WithMany()
+                        .HasForeignKey("MedicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("GastroIntestinal");
+
+                    b.Navigation("Medication");
+                });
+
             modelBuilder.Entity("IcuNotes.Models.Neurology", b =>
                 {
                     b.HasOne("IcuNotes.Models.Patient", "Patient")
@@ -440,6 +534,11 @@ namespace IcuNotes.Migrations
                     b.Navigation("Medications");
                 });
 
+            modelBuilder.Entity("IcuNotes.Models.GastroIntestinal", b =>
+                {
+                    b.Navigation("Items");
+                });
+
             modelBuilder.Entity("IcuNotes.Models.Neurology", b =>
                 {
                     b.Navigation("Medications");
@@ -448,6 +547,8 @@ namespace IcuNotes.Migrations
             modelBuilder.Entity("IcuNotes.Models.Patient", b =>
                 {
                     b.Navigation("Cardiology");
+
+                    b.Navigation("GastroIntestinal");
 
                     b.Navigation("Neurology");
 

@@ -49,6 +49,9 @@ namespace IcuNotes.Services
                 .Include(p => p.Cardiology)
                     .ThenInclude(c => c!.Medications)
                         .ThenInclude(cm => cm.Medication)
+                .Include(p => p.GastroIntestinal)
+                    .ThenInclude(g => g!.Items)
+                        .ThenInclude(gi => gi.Medication)
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
 
@@ -68,6 +71,7 @@ namespace IcuNotes.Services
         // - PatientSummary
         // - Neurology
         // - Cardiology
+        // - GastroIntestinal
         // - PatientDateEvents
         public async Task UpdateAsync(Patient patient)
         {
@@ -82,6 +86,8 @@ namespace IcuNotes.Services
                     .ThenInclude(n => n!.Medications)
                 .Include(p => p.Cardiology)
                     .ThenInclude(c => c!.Medications)
+                .Include(p => p.GastroIntestinal)
+                    .ThenInclude(g => g!.Items)
                 .FirstOrDefaultAsync(p => p.Id == patient.Id);
 
             if (existingPatient is null)
@@ -340,7 +346,116 @@ namespace IcuNotes.Services
                 }
             }
 
-            // 5) Update PatientDateEvents.
+            // 5) Update or create GastroIntestinal.
+            if (patient.GastroIntestinal is null)
+            {
+                // If the incoming object has no GIT section,
+                // leave the current database GIT section unchanged.
+            }
+            else if (existingPatient.GastroIntestinal is null)
+            {
+                // Create a new GIT row if the database does not have one yet.
+                existingPatient.GastroIntestinal = new GastroIntestinal
+                {
+                    PatientId = existingPatient.Id,
+                    FeedingRoute = patient.GastroIntestinal.FeedingRoute,
+                    LastBowelMotionDate = patient.GastroIntestinal.LastBowelMotionDate,
+                    IntraAbdominalPressure = patient.GastroIntestinal.IntraAbdominalPressure,
+                    AbdominalGirth = patient.GastroIntestinal.AbdominalGirth,
+                    HasGiBleeding = patient.GastroIntestinal.HasGiBleeding,
+                    GitNotes = patient.GastroIntestinal.GitNotes
+                };
+
+                // Add the incoming formula, IV fluid, and other medication rows
+                // to the new GIT section.
+                foreach (var incomingItem in patient.GastroIntestinal.Items ?? new List<GastroIntestinalItem>())
+                {
+                    // Ignore incomplete rows where no catalog item was selected yet.
+                    if (incomingItem.MedicationId <= 0)
+                        continue;
+
+                    existingPatient.GastroIntestinal.Items.Add(new GastroIntestinalItem
+                    {
+                        MedicationId = incomingItem.MedicationId,
+                        Category = incomingItem.Category,
+                        DoseOrRate = incomingItem.DoseOrRate
+                    });
+                }
+            }
+            else
+            {
+                // Update the existing GIT scalar fields.
+                existingPatient.GastroIntestinal.FeedingRoute = patient.GastroIntestinal.FeedingRoute;
+                existingPatient.GastroIntestinal.LastBowelMotionDate = patient.GastroIntestinal.LastBowelMotionDate;
+                existingPatient.GastroIntestinal.IntraAbdominalPressure = patient.GastroIntestinal.IntraAbdominalPressure;
+                existingPatient.GastroIntestinal.AbdominalGirth = patient.GastroIntestinal.AbdominalGirth;
+                existingPatient.GastroIntestinal.HasGiBleeding = patient.GastroIntestinal.HasGiBleeding;
+                existingPatient.GastroIntestinal.GitNotes = patient.GastroIntestinal.GitNotes;
+
+                // Update formula, IV fluid, and other medication rows.
+                var incomingItems = patient.GastroIntestinal.Items ?? new List<GastroIntestinalItem>();
+
+                // Collect the real database Ids coming from the page.
+                var incomingExistingItemIds = incomingItems
+                    .Where(i => i.Id > 0)
+                    .Select(i => i.Id)
+                    .ToHashSet();
+
+                // Remove database rows that no longer exist in the incoming list.
+                var itemsToRemove = existingPatient.GastroIntestinal.Items
+                    .Where(dbItem => !incomingExistingItemIds.Contains(dbItem.Id))
+                    .ToList();
+
+                foreach (var dbItem in itemsToRemove)
+                {
+                    context.Remove(dbItem);
+                }
+
+                // Add new rows and update existing rows.
+                foreach (var incomingItem in incomingItems)
+                {
+                    // Ignore incomplete rows where no catalog item was selected yet.
+                    if (incomingItem.MedicationId <= 0)
+                        continue;
+
+                    if (incomingItem.Id == 0)
+                    {
+                        // This is a new GIT item row created on the page.
+                        existingPatient.GastroIntestinal.Items.Add(new GastroIntestinalItem
+                        {
+                            MedicationId = incomingItem.MedicationId,
+                            Category = incomingItem.Category,
+                            DoseOrRate = incomingItem.DoseOrRate
+                        });
+                    }
+                    else
+                    {
+                        // This is an existing GIT item row.
+                        var existingItem = existingPatient.GastroIntestinal.Items
+                            .FirstOrDefault(i => i.Id == incomingItem.Id);
+
+                        if (existingItem is null)
+                        {
+                            // Safety fallback:
+                            // if for some reason it was not loaded, add it as a new row.
+                            existingPatient.GastroIntestinal.Items.Add(new GastroIntestinalItem
+                            {
+                                MedicationId = incomingItem.MedicationId,
+                                Category = incomingItem.Category,
+                                DoseOrRate = incomingItem.DoseOrRate
+                            });
+                        }
+                        else
+                        {
+                            existingItem.MedicationId = incomingItem.MedicationId;
+                            existingItem.Category = incomingItem.Category;
+                            existingItem.DoseOrRate = incomingItem.DoseOrRate;
+                        }
+                    }
+                }
+            }
+
+            // 6) Update PatientDateEvents.
             //
             // We compare the incoming events from the page with the events
             // already stored in the database.

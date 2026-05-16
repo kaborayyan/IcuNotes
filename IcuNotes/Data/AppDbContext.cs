@@ -46,6 +46,14 @@ namespace IcuNotes.Data
         // Many medication rows can belong to one cardiology section.
         public DbSet<CardiologyMedication> CardiologyMedications { get; set; } = null!;
 
+        // One GIT row per patient.
+        // GIT here means Gastrointestinal Tract, not Git source control.
+        public DbSet<GastroIntestinal> GastroIntestinals { get; set; } = null!;
+
+        // Many formula, IV fluid, and other medication rows can belong
+        // to one GIT section.
+        public DbSet<GastroIntestinalItem> GastroIntestinalItems { get; set; } = null!;
+
         // This is the place for extra database configuration.
         // We use it to define relationships clearly so EF Core
         // does not guess the wrong foreign keys.
@@ -89,6 +97,19 @@ namespace IcuNotes.Data
                 .HasOne(p => p.Cardiology)
                 .WithOne(c => c.Patient)
                 .HasForeignKey<Cardiology>(c => c.PatientId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Patient <-> GastroIntestinal
+            // One patient has one GIT record, and one GIT record
+            // belongs to one patient.
+            //
+            // We connect both navigation properties explicitly:
+            // Patient.GastroIntestinal points to the patient's GIT section,
+            // and GastroIntestinal.Patient points back to the owning patient.
+            modelBuilder.Entity<GastroIntestinal>()
+                .HasOne(g => g.Patient)
+                .WithOne(p => p.GastroIntestinal)
+                .HasForeignKey<GastroIntestinal>(g => g.PatientId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Patient <-> PatientDateEvent
@@ -140,6 +161,26 @@ namespace IcuNotes.Data
                 .HasForeignKey(cm => cm.MedicationId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // GastroIntestinal <-> GastroIntestinalItem
+            // One GIT section can have many rows.
+            // Those rows may represent formulas, IV fluids, or other GIT medications.
+            modelBuilder.Entity<GastroIntestinal>()
+                .HasMany(g => g.Items)
+                .WithOne(gi => gi.GastroIntestinal)
+                .HasForeignKey(gi => gi.GastroIntestinalId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // GastroIntestinalItem -> Medication
+            // Many GIT item rows can point to one shared catalog item.
+            // The same catalog is reused for formulas, IV fluids, and medications.
+            // Restrict delete so a catalog item cannot be removed while it is
+            // still used by any patient GIT row.
+            modelBuilder.Entity<GastroIntestinalItem>()
+                .HasOne(gi => gi.Medication)
+                .WithMany()
+                .HasForeignKey(gi => gi.MedicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // ArchivedPatient <-> ArchivedPatientDateEvent
             // One archived patient can have many archived date events,
             // and each archived date event belongs to one archived patient.
@@ -165,6 +206,12 @@ namespace IcuNotes.Data
             // which enforces one cardiology record per patient.
             modelBuilder.Entity<Cardiology>()
                 .HasIndex(c => c.PatientId)
+                .IsUnique();
+
+            // This makes PatientId unique in GastroIntestinals,
+            // which enforces one GIT record per patient.
+            modelBuilder.Entity<GastroIntestinal>()
+                .HasIndex(g => g.PatientId)
                 .IsUnique();
 
             // This makes medication names unique in the shared catalog.
