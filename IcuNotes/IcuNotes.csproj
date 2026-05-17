@@ -67,19 +67,19 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="bootstrap" Version="5.3.8" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7">
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.7" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.7">
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.8">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.60" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.60" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.7" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.8" />
+        <PackageReference Include="MudBlazor" Version="9.4.0" />
     </ItemGroup>
 
 </Project>

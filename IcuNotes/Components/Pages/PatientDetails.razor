@@ -1,173 +1,76 @@
 ﻿@page "/patients/{id:int}"
 @using IcuNotes.Models
-@using IcuNotes.Constants
 @using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
 @inject IcuNotes.Services.PatientService PatientService
 @implements IDisposable
 
 <PageTitle>Patient Details</PageTitle>
 
-@* Save/reload feedback is shown in the fixed bottom bar,
-   so the top of the page stays as clean as possible. *@
+@*
+    This page is the coordinator for the patient details screen.
+
+    It owns:
+    - loading the patient
+    - creating EditContext objects
+    - tracking dirty states
+    - saving and reloading sections
+
+    The MudBlazor page shell has been moved into smaller UI components:
+    - PatientDetailsHeader.razor
+    - PatientDetailsActionBar.razor
+*@
+
 @if (isLoading)
 {
-    <div class="alert alert-info py-2 px-3 small mb-2">
-        Loading patient details...
-    </div>
+    <MudContainer MaxWidth="MaxWidth.False"
+                  Style="padding: 0.5rem 0.75rem 0;">
+        <MudAlert Severity="Severity.Info"
+                  Variant="Variant.Outlined"
+                  Dense="true"
+                  Icon="@Icons.Material.Filled.Info">
+            Loading patient details...
+        </MudAlert>
+    </MudContainer>
 }
 else if (patient is null)
 {
-    <div class="alert alert-warning py-2 px-3 small mb-2">
-        Patient not found.
-    </div>
+    <MudContainer MaxWidth="MaxWidth.False"
+                  Style="padding: 0.5rem 0.75rem 0;">
+        <MudStack Spacing="2">
+            <MudAlert Severity="Severity.Warning"
+                      Variant="Variant.Outlined"
+                      Dense="true"
+                      Icon="@Icons.Material.Filled.Warning">
+                Patient not found.
+            </MudAlert>
 
-    <a href="/patients" class="btn btn-outline-secondary btn-sm">
-        Back to Patients
-    </a>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Secondary"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Href="/patients">
+                Back to Patients
+            </MudButton>
+        </MudStack>
+    </MudContainer>
 }
 else
 {
-    @* Main page container.
+    <MudContainer MaxWidth="MaxWidth.False"
+                  Class="patient-details-page"
+                  Style="padding: 0.5rem 0.75rem 0;">
 
-       The child sections already use Bootstrap cards, so this parent page
-       avoids adding another large card around them. This saves vertical space
-       and prevents the mobile UI from feeling like cards inside cards.
-    *@
-    <div class="patient-details-page">
-
-        @* Patient section tabs.
-
-           UI goals:
-           - Keep the tabs easy to reach while scrolling.
-           - Avoid horizontal page scrolling on mobile.
-           - Keep patient name and bed always visible.
-           - Use Bootstrap utilities as much as possible.
-           - Avoid JavaScript.
-
-           The patient name and bed live inside this sticky tab container.
-           This makes them visible while reviewing any section.
-        *@
-        <div class="position-sticky bg-white border rounded-3 shadow-sm p-2 mb-2"
-             style="top: calc(3rem + env(safe-area-inset-top)); z-index: 1010;">
-
-            @* Compact patient identity row.
-
-               The small text and rounded badge keep the header readable
-               without wasting vertical space on a phone.
-            *@
-            <div class="d-flex align-items-center gap-2 mb-2 small">
-                <span class="fw-semibold text-truncate">
-                    @patient.Name
-                </span>
-
-                @if (!string.IsNullOrWhiteSpace(patient.Bed))
-                {
-                    <span class="badge rounded-pill bg-light text-dark border flex-shrink-0">
-                        Bed @patient.Bed
-                    </span>
-                }
-                else
-                {
-                    <span class="badge rounded-pill bg-light text-muted border flex-shrink-0">
-                        No bed
-                    </span>
-                }
-            </div>
-
-            @* Horizontally scrollable tabs.
-
-               overflow-auto:
-               Allows the tab row to scroll left/right on mobile.
-
-               flex-nowrap:
-               Prevents the tabs from wrapping into multiple lines.
-
-               flex-shrink-0 in GetTabButtonClass:
-               Prevents each tab from being squeezed too much.
-            *@
-            <div class="overflow-auto">
-                <div class="nav nav-pills flex-nowrap gap-1"
-                     role="tablist"
-                     aria-label="Patient sections">
-
-                    <button type="button"
-                            class='@GetTabButtonClass("overview")'
-                            role="tab"
-                            aria-selected='@IsTabActive("overview")'
-                            @onclick='() => SelectTab("overview")'>
-                        <span>Overview</span>
-
-                        @if (isOverviewDirty || isTimelineDirty)
-                        {
-                            <span class="badge rounded-pill bg-warning text-dark ms-1">
-                                @GetOverviewTabUnsavedText()
-                            </span>
-                        }
-                    </button>
-
-                    <button type="button"
-                            class='@GetTabButtonClass("summary")'
-                            role="tab"
-                            aria-selected='@IsTabActive("summary")'
-                            @onclick='() => SelectTab("summary")'>
-                        <span>Summary</span>
-
-                        @if (isSummaryDirty)
-                        {
-                            <span class="badge rounded-pill bg-warning text-dark ms-1">
-                                Unsaved
-                            </span>
-                        }
-                    </button>
-
-                    <button type="button"
-                            class='@GetTabButtonClass("neurology")'
-                            role="tab"
-                            aria-selected='@IsTabActive("neurology")'
-                            @onclick='() => SelectTab("neurology")'>
-                        <span>Neurology</span>
-
-                        @if (isNeurologyDirty)
-                        {
-                            <span class="badge rounded-pill bg-warning text-dark ms-1">
-                                Unsaved
-                            </span>
-                        }
-                    </button>
-
-                    <button type="button"
-                            class='@GetTabButtonClass("cardiology")'
-                            role="tab"
-                            aria-selected='@IsTabActive("cardiology")'
-                            @onclick='() => SelectTab("cardiology")'>
-                        <span>Cardiology</span>
-
-                        @if (isCardiologyDirty)
-                        {
-                            <span class="badge rounded-pill bg-warning text-dark ms-1">
-                                Unsaved
-                            </span>
-                        }
-                    </button>
-
-                    <button type="button"
-                            class='@GetTabButtonClass("gastrointestinal")'
-                            role="tab"
-                            aria-selected='@IsTabActive("gastrointestinal")'
-                            @onclick='() => SelectTab("gastrointestinal")'>
-                        <span>GIT</span>
-
-                        @if (isGastroIntestinalDirty)
-                        {
-                            <span class="badge rounded-pill bg-warning text-dark ms-1">
-                                Unsaved
-                            </span>
-                        }
-                    </button>
-
-                </div>
-            </div>
-        </div>
+        <PatientDetailsHeader PatientName="@patient.Name"
+                              Bed="@patient.Bed"
+                              ActiveSection="@activeTab"
+                              IsOverviewDirty="@isOverviewDirty"
+                              IsTimelineDirty="@isTimelineDirty"
+                              IsSummaryDirty="@isSummaryDirty"
+                              IsNeurologyDirty="@isNeurologyDirty"
+                              IsCardiologyDirty="@isCardiologyDirty"
+                              IsGastroIntestinalDirty="@isGastroIntestinalDirty"
+                              OnSectionChanged="SelectTab" />
 
         @* Render Overview through its own child component.
            Overview also contains the timeline. *@
@@ -230,83 +133,16 @@ else
                                      OnMedicationsChanged="HandleMedicationsChangedAsync"
                                      OnStatusMessage="HandleChildStatusMessageAsync" />
         }
+    </MudContainer>
 
-        @* Small navigation button.
-           It stays outside the fixed Save/Reload bar because the bottom bar
-           should only handle the currently active section. *@
-        <div class="mt-2">
-            <a href="/patients" class="btn btn-outline-secondary btn-sm">
-                Back to Patients
-            </a>
-        </div>
-    </div>
-
-    @* This spacer prevents the fixed bottom bar from covering the bottom of the page content. *@
-    <div class="patient-details-bottom-spacer" aria-hidden="true"></div>
-
-    @* Fixed bottom action bar.
-
-       This bar saves or reloads only the currently active section.
-       The section components do not need their own Save/Reload buttons anymore.
-    *@
-    <div class="fixed-bottom patient-details-action-bar bg-white border-top shadow-sm">
-        <div class="container-fluid px-2 px-sm-3">
-            <div class="d-flex flex-column gap-2">
-                <div class="@GetActiveSectionStatusCssClass() text-truncate">
-                    @GetActiveSectionStatusText()
-                </div>
-
-                <div class="row g-2">
-                    <div class="col-5 col-sm-auto">
-                        <button type="button"
-                                class="btn btn-outline-secondary btn-sm w-100"
-                                disabled="@isSaving"
-                                @onclick="ReloadPatientAsync">
-                            Reload
-                        </button>
-                    </div>
-
-                    <div class="col-7 col-sm-auto">
-                        <button type="button"
-                                class="btn btn-primary btn-sm w-100"
-                                disabled="@(isSaving || !IsActiveSectionDirty())"
-                                @onclick="SaveActiveSectionAsync">
-                            @if (isSaving)
-                            {
-                                <span>Saving...</span>
-                            }
-                            else
-                            {
-                                <span>Save @GetActiveSectionName()</span>
-                            }
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <PatientDetailsActionBar StatusText="@GetActiveSectionStatusText()"
+                             StatusColor="@GetActiveSectionStatusColor()"
+                             ActiveSectionName="@GetActiveSectionName()"
+                             IsActiveSectionDirty="@IsActiveSectionDirty()"
+                             IsSaving="@isSaving"
+                             OnReload="ReloadPatientAsync"
+                             OnSave="SaveActiveSectionAsync" />
 }
-
-<style>
-    /* The fixed action bar uses Bootstrap for layout and styling.
-                   These small CSS rules only handle safe-area padding and the spacer
-                   needed because the bar is fixed to the bottom of the screen. */
-    .patient-details-action-bar {
-        z-index: 1030;
-        padding-top: 0.5rem;
-        padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
-    }
-
-    .patient-details-bottom-spacer {
-        height: 88px;
-    }
-
-    @@media (max-width: 575.98px) {
-        .patient-details-bottom-spacer {
-            height: 108px;
-        }
-    }
-</style>
 
 @code {
     [Parameter]
@@ -314,7 +150,7 @@ else
 
     private Patient? patient;
     private string? statusMessage;
-    private string statusCssClass = "alert-info";
+    private Color statusColor = Color.Info;
     private bool isLoading = true;
     private bool isSaving = false;
     private string activeTab = "overview";
@@ -357,7 +193,7 @@ else
         if (patient is null)
         {
             statusMessage = "The requested patient was not found.";
-            statusCssClass = "alert-warning";
+            statusColor = Color.Warning;
             orderedDateEvents = new List<PatientDateEvent>();
         }
         else
@@ -368,7 +204,7 @@ else
             ResetDirtyFlags();
 
             statusMessage = null;
-            statusCssClass = "alert-info";
+            statusColor = Color.Info;
         }
 
         isLoading = false;
@@ -380,37 +216,47 @@ else
         if (patient is null)
             return;
 
-        patient.PatientSummary ??= new PatientSummary
-        {
-            PatientId = patient.Id
-        };
-
-        patient.PatientDateEvents ??= new List<PatientDateEvent>();
-
-        patient.Neurology ??= new Neurology
-        {
-            PatientId = patient.Id
-        };
-
-        patient.Neurology.Medications ??= new List<NeurologyMedication>();
-
-        patient.Cardiology ??= new Cardiology
-        {
-            PatientId = patient.Id
-        };
-
-        patient.Cardiology.Medications ??= new List<CardiologyMedication>();
-
-        patient.GastroIntestinal ??= new GastroIntestinal
-        {
-            PatientId = patient.Id
-        };
-
-        patient.GastroIntestinal.Items ??= new List<GastroIntestinalItem>();
+        EnsurePatientChildObjects(patient);
 
         orderedDateEvents = patient.PatientDateEvents
             .OrderBy(e => e.EventDate)
             .ToList();
+    }
+
+    // This helper can prepare any Patient object, not only the one currently displayed.
+    // We use it when saving a clean database copy of the patient.
+    private static void EnsurePatientChildObjects(Patient targetPatient)
+    {
+        targetPatient.PatientSummary ??= new PatientSummary
+        {
+            PatientId = targetPatient.Id
+        };
+
+        targetPatient.PatientDateEvents ??= new List<PatientDateEvent>();
+
+        targetPatient.Neurology ??= new Neurology
+        {
+            PatientId = targetPatient.Id
+        };
+
+        targetPatient.Neurology.PatientId = targetPatient.Id;
+        targetPatient.Neurology.Medications ??= new List<NeurologyMedication>();
+
+        targetPatient.Cardiology ??= new Cardiology
+        {
+            PatientId = targetPatient.Id
+        };
+
+        targetPatient.Cardiology.PatientId = targetPatient.Id;
+        targetPatient.Cardiology.Medications ??= new List<CardiologyMedication>();
+
+        targetPatient.GastroIntestinal ??= new GastroIntestinal
+        {
+            PatientId = targetPatient.Id
+        };
+
+        targetPatient.GastroIntestinal.PatientId = targetPatient.Id;
+        targetPatient.GastroIntestinal.Items ??= new List<GastroIntestinalItem>();
     }
 
     // Create one EditContext per section and subscribe to change tracking.
@@ -489,6 +335,250 @@ else
         isGastroIntestinalDirty = false;
     }
 
+    // Every section save uses a fresh database copy.
+    // This prevents an unsaved change in another section from being saved accidentally.
+    private async Task<Patient> GetCleanPatientForSaveAsync()
+    {
+        var patientToSave = await PatientService.GetByIdAsync(Id);
+
+        if (patientToSave is null)
+            throw new InvalidOperationException("The patient could not be found in the database.");
+
+        EnsurePatientChildObjects(patientToSave);
+
+        return patientToSave;
+    }
+
+    // Copy only the small Overview fields.
+    // Do not copy Summary, Neurology, Cardiology, GIT, or Timeline here.
+    private static void CopyOverviewFields(Patient sourcePatient, Patient targetPatient)
+    {
+        targetPatient.Name = sourcePatient.Name;
+        targetPatient.Bed = sourcePatient.Bed;
+        targetPatient.Age = sourcePatient.Age;
+        targetPatient.Weight = sourcePatient.Weight;
+        targetPatient.Diagnosis = sourcePatient.Diagnosis;
+        targetPatient.AdmissionUnitCatalogId = sourcePatient.AdmissionUnitCatalogId;
+    }
+
+    private static void CopySummarySection(Patient sourcePatient, Patient targetPatient)
+    {
+        if (sourcePatient.PatientSummary is null)
+            return;
+
+        targetPatient.PatientSummary ??= new PatientSummary
+        {
+            PatientId = targetPatient.Id
+        };
+
+        targetPatient.PatientSummary.PatientId = targetPatient.Id;
+        targetPatient.PatientSummary.CombinedHistory = sourcePatient.PatientSummary.CombinedHistory;
+        targetPatient.PatientSummary.EventsTodo = sourcePatient.PatientSummary.EventsTodo;
+    }
+
+    private static void CopyTimelineSection(IEnumerable<PatientDateEvent> sourceEvents, Patient targetPatient)
+    {
+        targetPatient.PatientDateEvents = sourceEvents
+            .Select(item => new PatientDateEvent
+            {
+                Id = item.Id,
+                PatientId = targetPatient.Id,
+                EventDate = item.EventDate,
+                Title = item.Title
+            })
+            .OrderBy(item => item.EventDate)
+            .ToList();
+    }
+
+    private static void CopyNeurologySection(Patient sourcePatient, Patient targetPatient)
+    {
+        if (sourcePatient.Neurology is null)
+            return;
+
+        targetPatient.Neurology ??= new Neurology
+        {
+            PatientId = targetPatient.Id
+        };
+
+        targetPatient.Neurology.PatientId = targetPatient.Id;
+        targetPatient.Neurology.GcsEye = sourcePatient.Neurology.GcsEye;
+        targetPatient.Neurology.GcsVerbal = sourcePatient.Neurology.GcsVerbal;
+        targetPatient.Neurology.GcsMotor = sourcePatient.Neurology.GcsMotor;
+        targetPatient.Neurology.Pupils = sourcePatient.Neurology.Pupils;
+        targetPatient.Neurology.MotorStatus = sourcePatient.Neurology.MotorStatus;
+
+        targetPatient.Neurology.Medications = sourcePatient.Neurology.Medications
+            .Select(item => new NeurologyMedication
+            {
+                Id = item.Id,
+                Category = item.Category,
+                MedicationId = item.MedicationId,
+                Dose = item.Dose
+            })
+            .ToList();
+    }
+
+    private static void CopyCardiologySection(Patient sourcePatient, Patient targetPatient)
+    {
+        if (sourcePatient.Cardiology is null)
+            return;
+
+        targetPatient.Cardiology ??= new Cardiology
+        {
+            PatientId = targetPatient.Id
+        };
+
+        targetPatient.Cardiology.PatientId = targetPatient.Id;
+        targetPatient.Cardiology.HeartRate = sourcePatient.Cardiology.HeartRate;
+        targetPatient.Cardiology.SystolicBloodPressure = sourcePatient.Cardiology.SystolicBloodPressure;
+        targetPatient.Cardiology.DiastolicBloodPressure = sourcePatient.Cardiology.DiastolicBloodPressure;
+        targetPatient.Cardiology.CentralVenousPressure = sourcePatient.Cardiology.CentralVenousPressure;
+        targetPatient.Cardiology.InferiorVenaCava = sourcePatient.Cardiology.InferiorVenaCava;
+        targetPatient.Cardiology.CardiacIndex = sourcePatient.Cardiology.CardiacIndex;
+        targetPatient.Cardiology.CardiacOutput = sourcePatient.Cardiology.CardiacOutput;
+        targetPatient.Cardiology.SystemicVascularResistance = sourcePatient.Cardiology.SystemicVascularResistance;
+        targetPatient.Cardiology.PulmonaryCapillaryWedgePressure = sourcePatient.Cardiology.PulmonaryCapillaryWedgePressure;
+        targetPatient.Cardiology.Notes = sourcePatient.Cardiology.Notes;
+
+        targetPatient.Cardiology.Medications = sourcePatient.Cardiology.Medications
+            .Select(item => new CardiologyMedication
+            {
+                Id = item.Id,
+                Category = item.Category,
+                MedicationId = item.MedicationId,
+                Dose = item.Dose
+            })
+            .ToList();
+    }
+
+    private static void CopyGastroIntestinalSection(Patient sourcePatient, Patient targetPatient)
+    {
+        if (sourcePatient.GastroIntestinal is null)
+            return;
+
+        targetPatient.GastroIntestinal ??= new GastroIntestinal
+        {
+            PatientId = targetPatient.Id
+        };
+
+        targetPatient.GastroIntestinal.PatientId = targetPatient.Id;
+        targetPatient.GastroIntestinal.FeedingRoute = sourcePatient.GastroIntestinal.FeedingRoute;
+        targetPatient.GastroIntestinal.LastBowelMotionDate = sourcePatient.GastroIntestinal.LastBowelMotionDate;
+        targetPatient.GastroIntestinal.IntraAbdominalPressure = sourcePatient.GastroIntestinal.IntraAbdominalPressure;
+        targetPatient.GastroIntestinal.AbdominalGirth = sourcePatient.GastroIntestinal.AbdominalGirth;
+        targetPatient.GastroIntestinal.HasGiBleeding = sourcePatient.GastroIntestinal.HasGiBleeding;
+        targetPatient.GastroIntestinal.GitNotes = sourcePatient.GastroIntestinal.GitNotes;
+
+        targetPatient.GastroIntestinal.Items = sourcePatient.GastroIntestinal.Items
+            .Select(item => new GastroIntestinalItem
+            {
+                Id = item.Id,
+                Category = item.Category,
+                MedicationId = item.MedicationId,
+                DoseOrRate = item.DoseOrRate
+            })
+            .ToList();
+    }
+
+    private async Task<Patient?> GetSavedPatientFromDatabaseAsync()
+    {
+        var savedPatient = await PatientService.GetByIdAsync(Id);
+
+        if (savedPatient is not null)
+            EnsurePatientChildObjects(savedPatient);
+
+        return savedPatient;
+    }
+
+    private async Task RefreshOverviewFieldsFromDatabaseAsync()
+    {
+        if (patient is null)
+            return;
+
+        var savedPatient = await GetSavedPatientFromDatabaseAsync();
+
+        if (savedPatient is null)
+            return;
+
+        CopyOverviewFields(savedPatient, patient);
+        CreateEditContexts();
+    }
+
+    private async Task RefreshSummaryFromDatabaseAsync()
+    {
+        if (patient is null)
+            return;
+
+        var savedPatient = await GetSavedPatientFromDatabaseAsync();
+
+        if (savedPatient is null)
+            return;
+
+        CopySummarySection(savedPatient, patient);
+        CreateEditContexts();
+    }
+
+    private async Task RefreshTimelineFromDatabaseAsync()
+    {
+        if (patient is null)
+            return;
+
+        var savedPatient = await GetSavedPatientFromDatabaseAsync();
+
+        if (savedPatient is null)
+            return;
+
+        CopyTimelineSection(savedPatient.PatientDateEvents, patient);
+
+        orderedDateEvents = patient.PatientDateEvents
+            .OrderBy(item => item.EventDate)
+            .ToList();
+
+        CreateEditContexts();
+    }
+
+    private async Task RefreshNeurologyFromDatabaseAsync()
+    {
+        if (patient is null)
+            return;
+
+        var savedPatient = await GetSavedPatientFromDatabaseAsync();
+
+        if (savedPatient is null)
+            return;
+
+        CopyNeurologySection(savedPatient, patient);
+        CreateEditContexts();
+    }
+
+    private async Task RefreshCardiologyFromDatabaseAsync()
+    {
+        if (patient is null)
+            return;
+
+        var savedPatient = await GetSavedPatientFromDatabaseAsync();
+
+        if (savedPatient is null)
+            return;
+
+        CopyCardiologySection(savedPatient, patient);
+        CreateEditContexts();
+    }
+
+    private async Task RefreshGastroIntestinalFromDatabaseAsync()
+    {
+        if (patient is null)
+            return;
+
+        var savedPatient = await GetSavedPatientFromDatabaseAsync();
+
+        if (savedPatient is null)
+            return;
+
+        CopyGastroIntestinalSection(savedPatient, patient);
+        CreateEditContexts();
+    }
+
     private async Task SaveOverviewAsync()
     {
         if (patient is null)
@@ -498,17 +588,22 @@ else
         {
             isSaving = true;
 
-            await PatientService.UpdateAsync(patient);
+            var patientToSave = await GetCleanPatientForSaveAsync();
+
+            CopyOverviewFields(patient, patientToSave);
+
+            await PatientService.UpdateAsync(patientToSave);
+            await RefreshOverviewFieldsFromDatabaseAsync();
 
             isOverviewDirty = false;
 
             statusMessage = "Overview saved successfully.";
-            statusCssClass = "alert-success";
+            statusColor = Color.Success;
         }
         catch (Exception ex)
         {
             statusMessage = $"Error while saving Overview: {ex.Message}";
-            statusCssClass = "alert-danger";
+            statusColor = Color.Error;
         }
         finally
         {
@@ -525,17 +620,22 @@ else
         {
             isSaving = true;
 
-            await PatientService.UpdateAsync(patient);
+            var patientToSave = await GetCleanPatientForSaveAsync();
+
+            CopySummarySection(patient, patientToSave);
+
+            await PatientService.UpdateAsync(patientToSave);
+            await RefreshSummaryFromDatabaseAsync();
 
             isSummaryDirty = false;
 
             statusMessage = "Summary saved successfully.";
-            statusCssClass = "alert-success";
+            statusColor = Color.Success;
         }
         catch (Exception ex)
         {
             statusMessage = $"Error while saving Summary: {ex.Message}";
-            statusCssClass = "alert-danger";
+            statusColor = Color.Error;
         }
         finally
         {
@@ -552,30 +652,22 @@ else
         {
             isSaving = true;
 
-            patient.PatientDateEvents = orderedDateEvents
-                .OrderBy(e => e.EventDate)
-                .ToList();
+            var patientToSave = await GetCleanPatientForSaveAsync();
 
-            await PatientService.UpdateAsync(patient);
+            CopyTimelineSection(orderedDateEvents, patientToSave);
 
-            // Reload after timeline save so new events get real database Ids.
-            patient = await PatientService.GetByIdAsync(Id);
-
-            if (patient is not null)
-            {
-                EnsurePatientChildObjects();
-                CreateEditContexts();
-            }
+            await PatientService.UpdateAsync(patientToSave);
+            await RefreshTimelineFromDatabaseAsync();
 
             isTimelineDirty = false;
 
             statusMessage = "Timeline saved successfully.";
-            statusCssClass = "alert-success";
+            statusColor = Color.Success;
         }
         catch (Exception ex)
         {
             statusMessage = $"Error while saving Timeline: {ex.Message}";
-            statusCssClass = "alert-danger";
+            statusColor = Color.Error;
         }
         finally
         {
@@ -601,27 +693,22 @@ else
             patient.Neurology.PatientId = patient.Id;
             patient.Neurology.Medications ??= new List<NeurologyMedication>();
 
-            await PatientService.UpdateAsync(patient);
+            var patientToSave = await GetCleanPatientForSaveAsync();
 
-            // Reload after save so new medication rows get real database Ids
-            // and so Medication navigation properties are refreshed.
-            patient = await PatientService.GetByIdAsync(Id);
+            CopyNeurologySection(patient, patientToSave);
 
-            if (patient is not null)
-            {
-                EnsurePatientChildObjects();
-                CreateEditContexts();
-            }
+            await PatientService.UpdateAsync(patientToSave);
+            await RefreshNeurologyFromDatabaseAsync();
 
             isNeurologyDirty = false;
 
             statusMessage = "Neurology saved successfully.";
-            statusCssClass = "alert-success";
+            statusColor = Color.Success;
         }
         catch (Exception ex)
         {
             statusMessage = $"Error while saving Neurology: {ex.Message}";
-            statusCssClass = "alert-danger";
+            statusColor = Color.Error;
         }
         finally
         {
@@ -647,27 +734,22 @@ else
             patient.Cardiology.PatientId = patient.Id;
             patient.Cardiology.Medications ??= new List<CardiologyMedication>();
 
-            await PatientService.UpdateAsync(patient);
+            var patientToSave = await GetCleanPatientForSaveAsync();
 
-            // Reload after save so new medication rows get real database Ids
-            // and so Medication navigation properties are refreshed.
-            patient = await PatientService.GetByIdAsync(Id);
+            CopyCardiologySection(patient, patientToSave);
 
-            if (patient is not null)
-            {
-                EnsurePatientChildObjects();
-                CreateEditContexts();
-            }
+            await PatientService.UpdateAsync(patientToSave);
+            await RefreshCardiologyFromDatabaseAsync();
 
             isCardiologyDirty = false;
 
             statusMessage = "Cardiology saved successfully.";
-            statusCssClass = "alert-success";
+            statusColor = Color.Success;
         }
         catch (Exception ex)
         {
             statusMessage = $"Error while saving Cardiology: {ex.Message}";
-            statusCssClass = "alert-danger";
+            statusColor = Color.Error;
         }
         finally
         {
@@ -693,27 +775,22 @@ else
             patient.GastroIntestinal.PatientId = patient.Id;
             patient.GastroIntestinal.Items ??= new List<GastroIntestinalItem>();
 
-            await PatientService.UpdateAsync(patient);
+            var patientToSave = await GetCleanPatientForSaveAsync();
 
-            // Reload after save so new formula, IV fluid, and medication rows
-            // get real database Ids and refreshed catalog navigation properties.
-            patient = await PatientService.GetByIdAsync(Id);
+            CopyGastroIntestinalSection(patient, patientToSave);
 
-            if (patient is not null)
-            {
-                EnsurePatientChildObjects();
-                CreateEditContexts();
-            }
+            await PatientService.UpdateAsync(patientToSave);
+            await RefreshGastroIntestinalFromDatabaseAsync();
 
             isGastroIntestinalDirty = false;
 
             statusMessage = "GIT saved successfully.";
-            statusCssClass = "alert-success";
+            statusColor = Color.Success;
         }
         catch (Exception ex)
         {
             statusMessage = $"Error while saving GIT: {ex.Message}";
-            statusCssClass = "alert-danger";
+            statusColor = Color.Error;
         }
         finally
         {
@@ -871,18 +948,80 @@ else
     private Task HandleChildStatusMessageAsync(string message)
     {
         statusMessage = message;
-        statusCssClass = "alert-success";
+        statusColor = Color.Success;
         return Task.CompletedTask;
     }
 
     private async Task ReloadPatientAsync()
     {
-        await LoadPatientAsync();
+        if (patient is null || isSaving)
+            return;
 
-        statusMessage = $"{GetActiveSectionName()} changes reloaded.";
-        statusCssClass = "alert-info";
+        try
+        {
+            isSaving = true;
+
+            var savedPatient = await GetSavedPatientFromDatabaseAsync();
+
+            if (savedPatient is null)
+            {
+                statusMessage = "The patient could not be found in the database.";
+                statusColor = Color.Warning;
+                return;
+            }
+
+            switch (activeTab)
+            {
+                case "overview":
+                    // The Overview tab contains both overview fields and timeline rows.
+                    // Reloading here discards unsaved changes in both of them only.
+                    CopyOverviewFields(savedPatient, patient);
+                    CopyTimelineSection(savedPatient.PatientDateEvents, patient);
+
+                    orderedDateEvents = patient.PatientDateEvents
+                        .OrderBy(item => item.EventDate)
+                        .ToList();
+
+                    isOverviewDirty = false;
+                    isTimelineDirty = false;
+                    break;
+
+                case "summary":
+                    CopySummarySection(savedPatient, patient);
+                    isSummaryDirty = false;
+                    break;
+
+                case "neurology":
+                    CopyNeurologySection(savedPatient, patient);
+                    isNeurologyDirty = false;
+                    break;
+
+                case "cardiology":
+                    CopyCardiologySection(savedPatient, patient);
+                    isCardiologyDirty = false;
+                    break;
+
+                case "gastrointestinal":
+                    CopyGastroIntestinalSection(savedPatient, patient);
+                    isGastroIntestinalDirty = false;
+                    break;
+            }
+
+            CreateEditContexts();
+
+            statusMessage = $"{GetActiveSectionName()} changes reloaded.";
+            statusColor = Color.Info;
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error while reloading {GetActiveSectionName()}: {ex.Message}";
+            statusColor = Color.Error;
+        }
+        finally
+        {
+            isSaving = false;
+        }
     }
-
     private void SelectTab(string tabName)
     {
         activeTab = tabName;
@@ -891,49 +1030,8 @@ else
         // When the user moves to another tab, clear the old message
         // so the bottom bar can show the new section status.
         statusMessage = null;
-        statusCssClass = "alert-info";
+        statusColor = Color.Info;
     }
-
-    private string GetTabButtonClass(string tabName)
-    {
-        /*
-            These classes make each tab look like a Bootstrap pill.
-
-            text-nowrap:
-            Prevents tab text from breaking into two lines on a phone.
-
-            flex-shrink-0:
-            Prevents tabs from being squeezed inside the horizontal scroller.
-
-            active:
-            Bootstrap uses this class to highlight the selected nav-link.
-        */
-        return activeTab == tabName
-            ? "nav-link active text-nowrap flex-shrink-0 py-1 px-2 small"
-            : "nav-link text-nowrap flex-shrink-0 py-1 px-2 small";
-    }
-
-    private bool IsTabActive(string tabName)
-    {
-        return activeTab == tabName;
-    }
-
-    private string GetOverviewTabUnsavedText()
-    {
-        /*
-            The Overview tab contains two editable parts:
-            1) the overview fields
-            2) the timeline
-
-            If both changed, show "2 unsaved" so the badge gives more useful
-            information than a generic unsaved message.
-        */
-        if (isOverviewDirty && isTimelineDirty)
-            return "2 unsaved";
-
-        return "Unsaved";
-    }
-
     // The bottom bar uses this helper to show a friendly section name.
     private string GetActiveSectionName()
     {
@@ -992,29 +1090,16 @@ else
 
         return $"{GetActiveSectionName()} has loaded.";
     }
-
-    // This helper changes only the small status text color in the bottom bar.
-    private string GetActiveSectionStatusCssClass()
+    // This helper gives the MudBlazor action bar the correct Material color.
+    private Color GetActiveSectionStatusColor()
     {
         if (IsActiveSectionDirty())
-            return "text-warning fw-semibold small";
+            return Color.Warning;
 
         if (string.IsNullOrWhiteSpace(statusMessage))
-            return "text-muted small";
+            return Color.Secondary;
 
-        if (statusCssClass.Contains("alert-success"))
-            return "text-success fw-semibold small";
-
-        if (statusCssClass.Contains("alert-danger"))
-            return "text-danger fw-semibold small";
-
-        if (statusCssClass.Contains("alert-warning"))
-            return "text-warning fw-semibold small";
-
-        if (statusCssClass.Contains("alert-info"))
-            return "text-info fw-semibold small";
-
-        return "text-muted small";
+        return statusColor;
     }
 
     // This method is called by the fixed bottom Save button.
@@ -1052,7 +1137,7 @@ else
                 if (overviewWasDirty && timelineWasDirty && !isOverviewDirty && !isTimelineDirty)
                 {
                     statusMessage = "Overview and timeline saved successfully.";
-                    statusCssClass = "alert-success";
+                    statusColor = Color.Success;
                 }
 
                 break;

@@ -2,11 +2,56 @@
 
 <PageTitle>Home</PageTitle>
 
-<h1>IcuNotes</h1>
+<!-- MudBlazor Home page - Only navigation buttons to existing pages -->
 
-<p>Welcome to IcuNotes.</p>
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-4 px-2">
 
-<div class="d-flex gap-2">
-    <a href="/patients" class="btn btn-primary">Patients</a>
-    <a href="/archived-patients" class="btn btn-secondary">Archived Patients</a>
-</div>
+    <!--
+        MudPaper gives us a clean Material Design card-like surface.
+    -->
+    <MudPaper Elevation="1" Class="pa-4 rounded-lg">
+
+        <MudStack Spacing="3">
+
+            <!-- App title -->
+            <MudStack Spacing="1">
+                <MudText Typo="Typo.h4" Class="font-weight-bold">
+                    ICU Notes
+                </MudText>
+
+                <MudText Typo="Typo.body1" Color="Color.Secondary">
+                    Welcome to ICU Notes.
+                </MudText>
+            </MudStack>
+
+            <!--
+                Main navigation actions.
+
+                FullWidth="true" is better for mobile because the buttons are
+                easier to tap and align nicely on narrow screens.
+            -->
+            <MudStack Spacing="2">
+                <MudButton Href="/patients"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Groups">
+                    Patients
+                </MudButton>
+
+                <MudButton Href="/archived-patients"
+                           Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           Size="Size.Large"
+                           FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Archive">
+                    Archived Patients
+                </MudButton>
+            </MudStack>
+
+        </MudStack>
+
+    </MudPaper>
+
+</MudContainer>

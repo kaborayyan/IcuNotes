@@ -1,49 +1,124 @@
 ﻿@using IcuNotes.Models
 @using Microsoft.AspNetCore.Components.Forms
 
-@* This component contains the Summary section UI.
-   Saving and reloading are controlled by the fixed bottom bar in PatientDetails.razor. *@
+@*
+    This component edits the patient's written ICU summary.
+
+    Important:
+    - Saving and reloading are still controlled by PatientDetails.razor.
+    - The EditContext is still passed from the parent page.
+    - This keeps dirty tracking working the same way as before.
+    - This file is UI-only; it does not access the database or services.
+*@
 @if (Patient is not null)
 {
-    @* A Bootstrap card gives the section a compact mobile-friendly container
-       without needing custom CSS. *@
-    <div class="card border-0 shadow-sm">
-        <div class="card-body p-2 p-sm-3">
-            
+    <EditForm EditContext="SummaryEditContext">
+        <DataAnnotationsValidator />
 
-            @* This form edits the summary fields.
-               The EditContext still allows PatientDetails.razor to detect when fields change. *@
-            <EditForm EditContext="SummaryEditContext">
-                <DataAnnotationsValidator />
+        @*
+            This wrapper uses MudBlazor spacing and layout classes only.
+            There are no Bootstrap classes here.
+        *@
+        <MudStack Spacing="3">
 
-                @* Validation messages stay compact and close to the fields. *@
-                <ValidationSummary class="text-danger small mb-2" />
+            @*
+                ValidationSummary is still the standard Blazor validation component.
+                It is not Bootstrap.
+                We wrap it with MudBlazor typography/error classes so it fits the MudBlazor theme.
+            *@
+            <div class="mud-typography mud-typography-caption mud-error-text">
+                <ValidationSummary />
+            </div>
 
-                @* This field stores the main free-text clinical history and summary notes.
-                   form-control-sm reduces padding and makes the section feel lighter on mobile. *@
-                <div class="mb-2">
-                    <label class="form-label small fw-semibold mb-1" for="combined-history">
-                        History, admission and progress
-                    </label>
-                    <InputTextArea id="combined-history"
-                                   class="form-control form-control-sm"
-                                   rows="24"
-                                   @bind-Value="Patient.PatientSummary!.CombinedHistory" />
-                </div>
+            @*
+                Clinical summary card.
 
-                @* This field stores reminders, plans, or tasks related to the patient. *@
-                <div class="mb-0">
-                    <label class="form-label small fw-semibold mb-1" for="events-todo">
-                        Tasks
-                    </label>
-                    <InputTextArea id="events-todo"
-                                   class="form-control form-control-sm"
-                                   rows="6"
-                                   @bind-Value="Patient.PatientSummary!.EventsTodo" />
-                </div>
-            </EditForm>
-        </div>
-    </div>
+                Design choice:
+                Instead of copying the old Bootstrap card, this page uses a clean note-style layout.
+                The most important field is placed first and given more vertical space for phone typing.
+            *@
+            <MudPaper Elevation="1" Class="pa-3 rounded-lg">
+                <MudStack Spacing="2">
+                    <MudStack Row="true"
+                              AlignItems="AlignItems.Center"
+                              Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Notes"
+                                 Color="Color.Primary" />
+
+                        <MudText Typo="Typo.subtitle1">
+                            Clinical summary
+                        </MudText>
+                    </MudStack>
+
+                    <MudText Typo="Typo.caption"
+                             Color="Color.Secondary">
+                        History, admission details, ICU course, and progress notes.
+                    </MudText>
+
+                    @*
+                        We do not use plain @bind-Value here.
+
+                        MudBlazor updates the model correctly with @bind-Value, but the parent
+                        EditContext is not always notified automatically from inside child
+                        components.
+
+                        Therefore we use Value + ValueChanged:
+                        - Value displays the current text.
+                        - ValueChanged updates the model.
+                        - The handler manually notifies SummaryEditContext.
+
+                        This keeps the bottom Save button controlled by PatientDetails.razor.
+                    *@
+                    <MudTextField T="string"
+                                  Label="History, admission and progress"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Lines="22"
+                                  FullWidth="true"
+                                  Immediate="true"
+                                  Value="Patient.PatientSummary!.CombinedHistory"
+                                  ValueChanged="OnCombinedHistoryChanged" />
+                </MudStack>
+            </MudPaper>
+
+            @*
+                Tasks card.
+
+                This is intentionally smaller than the main summary field.
+                It is meant for reminders, follow-up items, and things to check later.
+            *@
+            <MudPaper Elevation="1" Class="pa-3 rounded-lg">
+                <MudStack Spacing="2">
+                    <MudStack Row="true"
+                              AlignItems="AlignItems.Center"
+                              Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.TaskAlt"
+                                 Color="Color.Success" />
+
+                        <MudText Typo="Typo.subtitle1">
+                            Tasks and reminders
+                        </MudText>
+                    </MudStack>
+
+                    <MudText Typo="Typo.caption"
+                             Color="Color.Secondary">
+                        Short notes, pending tasks, follow-up plans, or reminders.
+                    </MudText>
+
+                    <MudTextField T="string"
+                                  Label="Tasks"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Lines="7"
+                                  FullWidth="true"
+                                  Immediate="true"
+                                  Value="Patient.PatientSummary!.EventsTodo"
+                                  ValueChanged="OnEventsTodoChanged" />
+                </MudStack>
+            </MudPaper>
+
+        </MudStack>
+    </EditForm>
 }
 
 @code {
@@ -52,8 +127,57 @@
     public Patient? Patient { get; set; }
 
     // The parent page passes the EditContext so dirty tracking still stays in one place.
-    // When the user edits a Summary field, PatientDetails.razor detects the change
-    // and updates the fixed bottom bar.
+    // When the user edits a Summary field, this component manually notifies this
+    // EditContext. PatientDetails.razor then enables the fixed bottom Save button.
     [Parameter, EditorRequired]
     public EditContext SummaryEditContext { get; set; } = default!;
+
+    // Optional future-friendly callback.
+    // The current PatientDetails.razor can already detect changes through
+    // SummaryEditContext.NotifyFieldChanged(...), so this does not require a
+    // PatientDetails.razor change right now.
+    // If we later standardize all sections on explicit callbacks, this parameter
+    // is already prepared.
+    [Parameter]
+    public EventCallback OnSectionChanged { get; set; }
+
+    private async Task OnCombinedHistoryChanged(string value)
+    {
+        if (Patient?.PatientSummary is null)
+        {
+            return;
+        }
+
+        Patient.PatientSummary.CombinedHistory = value;
+        await NotifySummaryFieldChangedAsync(nameof(PatientSummary.CombinedHistory));
+    }
+
+    private async Task OnEventsTodoChanged(string value)
+    {
+        if (Patient?.PatientSummary is null)
+        {
+            return;
+        }
+
+        Patient.PatientSummary.EventsTodo = value;
+        await NotifySummaryFieldChangedAsync(nameof(PatientSummary.EventsTodo));
+    }
+
+    private async Task NotifySummaryFieldChangedAsync(string fieldName)
+    {
+        if (Patient?.PatientSummary is null)
+        {
+            return;
+        }
+
+        // Tell the parent EditContext exactly which Summary field changed.
+        // This triggers PatientDetails.razor's existing dirty-tracking handler.
+        SummaryEditContext.NotifyFieldChanged(
+            new FieldIdentifier(Patient.PatientSummary, fieldName));
+
+        // This is safe even when the parent does not pass a callback.
+        // It gives us a clean path if we later decide to use one standard
+        // OnSectionChanged callback in every section.
+        await OnSectionChanged.InvokeAsync();
+    }
 }

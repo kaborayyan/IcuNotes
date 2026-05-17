@@ -1,6 +1,7 @@
 ﻿@using IcuNotes.Models
 @using IcuNotes.Constants
 @using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
 
 @*
     OverviewSection.razor
@@ -11,280 +12,292 @@
     3) Admission unit catalog manager
     4) Patient timeline rows
 
-    UI goal in this version:
-    - Keep the section compact on mobile.
-    - Use Bootstrap floating labels.
-    - Use Bootstrap grid/card utilities.
-    - Avoid custom CSS.
-    - Avoid JavaScript.
+    Important architecture note:
+    - This component edits UI state only.
+    - PatientDetails.razor still owns saving, reloading, and dirty tracking.
+    - No database, service, or model code is used directly here.
 
-    Important note about placeholders:
-    Bootstrap floating labels require a placeholder attribute.
-    We use placeholder=" " so no visible duplicate text appears.
+    MudBlazor migration note:
+    - Bootstrap cards, rows, inputs, alerts, and buttons were replaced.
+    - AdmissionUnitsManager is intentionally kept outside the overview EditForm.
+    - If AdmissionUnitsManager still uses Bootstrap internally, we will migrate it later as its own file.
 *@
 
 @if (Patient is not null)
 {
-    <div class="vstack gap-3">
+    <MudStack Spacing="3">
 
-        <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 text-muted">
-                Overview
-            </h6>
-        </div>
+        @* Section introduction.
+           This gives the section a clear mobile-friendly entry point instead of a plain heading. *@
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+            <MudStack Spacing="1">
+                <MudText Typo="Typo.h6">Overview</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Core patient details, admission unit, and timeline events.
+                </MudText>
+            </MudStack>
+        </MudPaper>
 
         @if (!string.IsNullOrWhiteSpace(admissionUnitStatusMessage))
         {
-            <div class="alert alert-success py-2 mb-0">
+            <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
                 @admissionUnitStatusMessage
-            </div>
+            </MudAlert>
         }
 
         @*
             This form contains ONLY fields that belong to the current patient overview.
 
-            Important:
             AdmissionUnitsManager is intentionally outside this EditForm.
 
             Why?
-            If AdmissionUnitsManager is inside this EditForm, its modal InputText controls
-            receive the OverviewEditContext automatically from Blazor. Then typing inside
-            the modal marks Overview as dirty even though the patient itself was not changed.
-
-            By keeping AdmissionUnitsManager outside the EditForm, catalog editing is separated
-            from patient overview editing.
+            If AdmissionUnitsManager is inside this EditForm, its internal input controls
+            can receive the OverviewEditContext automatically from Blazor.
+            Then editing the catalog could mark Overview as dirty even though the patient
+            itself was not changed.
         *@
         <EditForm EditContext="OverviewEditContext">
             <DataAnnotationsValidator />
             <ValidationSummary />
 
-            <div class="card">
-                <div class="card-body p-2 p-sm-3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.subtitle1">Patient details</MudText>
 
-                    <div class="row g-2">
+                    <MudGrid Spacing="2">
 
                         @* Patient name can be wider because names may be long. *@
-                        <div class="col-12 col-md-6">
-                            <div class="form-floating">
-                                <InputText class="form-control"
-                                           id="patientName"
-                                           placeholder=" "
-                                           @bind-Value="Patient.Name" />
-
-                                <label for="patientName">
-                                    Name
-                                </label>
-                            </div>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField T="string"
+                                          Label="Name"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          FullWidth="true"
+                                          Immediate="true"
+                                          Disabled="@IsSaving"
+                                          Value="@Patient.Name"
+                                          ValueChanged="HandlePatientNameChangedAsync" />
 
                             <ValidationMessage For="@(() => Patient.Name)" />
-                        </div>
+                        </MudItem>
 
-                        @* Bed is short, so it does not need a wide column. *@
-                        <div class="col-6 col-sm-4 col-md-3">
-                            <div class="form-floating">
-                                <InputSelect class="form-select"
-                                             id="patientBed"
-                                             @bind-Value="Patient.Bed">
-                                    <option value="">Select</option>
+                        @* Bed is short, so it gets a compact column on larger screens. *@
+                        <MudItem xs="6" sm="3">
+                            <MudSelect T="string"
+                                       Label="Bed"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       FullWidth="true"
+                                       Disabled="@IsSaving"
+                                       Value="@Patient.Bed"
+                                       ValueChanged="HandlePatientBedChangedAsync">
+                                <MudSelectItem T="string" Value="@string.Empty">
+                                    Select bed
+                                </MudSelectItem>
 
-                                    @foreach (var bed in BedOptions.All)
-                                    {
-                                        <option value="@bed">@bed</option>
-                                    }
-                                </InputSelect>
-
-                                <label for="patientBed">
-                                    Bed
-                                </label>
-                            </div>
+                                @foreach (var bed in BedOptions.All)
+                                {
+                                    <MudSelectItem T="string" Value="@bed">
+                                        @bed
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
 
                             <ValidationMessage For="@(() => Patient.Bed)" />
-                        </div>
+                        </MudItem>
 
-                        @* Age is short, so it uses a narrow column. *@
-                        <div class="col-6 col-sm-4 col-md-3">
-                            <div class="form-floating">
-                                <InputNumber class="form-control"
-                                             id="patientAge"
-                                             placeholder=" "
-                                             @bind-Value="Patient.Age" />
-
-                                <label for="patientAge">
-                                    Age
-                                </label>
-                            </div>
+                        @* Age is usually a short value, so it stays compact on mobile. *@
+                        <MudItem xs="6" sm="3">
+                            <MudNumericField T="int?"
+                                             Label="Age"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             HideSpinButtons="true"
+                                             Min="@((int?)0)"
+                                             Disabled="@IsSaving"
+                                             Value="@Patient.Age"
+                                             ValueChanged="HandlePatientAgeChangedAsync" />
 
                             <ValidationMessage For="@(() => Patient.Age)" />
-                        </div>
+                        </MudItem>
 
-                        @* Weight is short, so it uses a narrow column. *@
-                        <div class="col-6 col-sm-4 col-md-3">
-                            <div class="form-floating">
-                                <InputNumber class="form-control"
-                                             id="patientWeight"
-                                             placeholder=" "
-                                             @bind-Value="Patient.Weight" />
-
-                                <label for="patientWeight">
-                                    Weight
-                                </label>
-                            </div>
+                        @* Weight is also a short value, so it does not need a full row. *@
+                        <MudItem xs="6" sm="3">
+                            <MudNumericField T="decimal?"
+                                             Label="Weight"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             HideSpinButtons="true"
+                                             Min="@((decimal?)0m)"
+                                             Disabled="@IsSaving"
+                                             Value="@Patient.Weight"
+                                             ValueChanged="HandlePatientWeightChangedAsync" />
 
                             <ValidationMessage For="@(() => Patient.Weight)" />
-                        </div>
+                        </MudItem>
 
-                        @* Diagnosis may be long, so it stays full width. *@
-                        <div class="col-12">
-                            <div class="form-floating">
-                                <InputText class="form-control"
-                                           id="patientDiagnosis"
-                                           placeholder=" "
-                                           @bind-Value="Patient.Diagnosis" />
-
-                                <label for="patientDiagnosis">
-                                    Diagnosis
-                                </label>
-                            </div>
+                        @* Diagnosis may be long, so it gets the full width. *@
+                        <MudItem xs="12">
+                            <MudTextField T="string"
+                                          Label="Diagnosis"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          FullWidth="true"
+                                          Immediate="true"
+                                          Disabled="@IsSaving"
+                                          Value="@Patient.Diagnosis"
+                                          ValueChanged="HandlePatientDiagnosisChangedAsync" />
 
                             <ValidationMessage For="@(() => Patient.Diagnosis)" />
-                        </div>
+                        </MudItem>
 
-                        @* Admission unit names may be long, so this stays wider. *@
-                        <div class="col-12 col-md-8">
-                            <div class="form-floating">
-                                <InputSelect class="form-select"
-                                             id="patientAdmissionUnit"
-                                             @bind-Value="Patient.AdmissionUnitCatalogId">
-                                    <option value="">Select</option>
+                        @* Admission unit selection belongs to the patient overview.
+                           Catalog editing itself stays outside this EditForm. *@
+                        <MudItem xs="12" sm="8">
+                            <MudSelect T="int?"
+                                       Label="Admission unit"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       FullWidth="true"
+                                       Disabled="@IsSaving"
+                                       Value="@Patient.AdmissionUnitCatalogId"
+                                       ValueChanged="HandleAdmissionUnitSelectionChangedAsync">
+                                <MudSelectItem T="int?" Value="@((int?)null)">
+                                    Select admission unit
+                                </MudSelectItem>
 
-                                    @foreach (var unit in AdmissionUnits)
-                                    {
-                                        <option value="@unit.Id">@unit.Name</option>
-                                    }
-                                </InputSelect>
+                                @foreach (var unit in AdmissionUnits)
+                                {
+                                    <MudSelectItem T="int?" Value="@((int?)unit.Id)">
+                                        @unit.Name
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
 
-                                <label for="patientAdmissionUnit">
-                                    Admission Unit
-                                </label>
-                            </div>
-
-                            <div class="form-text">
-                                Saved from the bottom bar.
-                            </div>
-                        </div>
-
-                    </div>
-
-                </div>
-            </div>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                Saved from the bottom Save button.
+                            </MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudStack>
+            </MudPaper>
         </EditForm>
 
         @*
             This reusable manager handles the shared Admission Unit catalog only.
 
             It is outside the Overview EditForm on purpose.
-
-            Clean separation:
-            - This manager adds/edits catalog rows.
-            - The dropdown above selects the admission unit for this patient.
-            - The bottom Save button saves the patient's selected admission unit.
+            The dropdown above selects the unit for this patient.
+            This manager adds/edits the shared catalog rows.
         *@
-        <AdmissionUnitsManager AdmissionUnits="AdmissionUnits"
-                               IsDisabled="IsSaving"
-                               OnAdmissionUnitsChanged="HandleAdmissionUnitsChangedAsync"
-                               OnStatusMessage="HandleAdmissionUnitStatusMessageAsync" />
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+            <MudStack Spacing="2">
+                <MudText Typo="Typo.subtitle1">Admission unit catalog</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Add or correct admission unit names here, then select the patient&apos;s unit above.
+                </MudText>
+
+                <AdmissionUnitsManager AdmissionUnits="AdmissionUnits"
+                                       IsDisabled="IsSaving"
+                                       OnAdmissionUnitsChanged="HandleAdmissionUnitsChangedAsync"
+                                       OnStatusMessage="HandleAdmissionUnitStatusMessageAsync" />
+            </MudStack>
+        </MudPaper>
 
         @* Timeline is part of Overview, but it has its own EditContext for dirty tracking. *@
-        <div class="d-flex justify-content-between align-items-center mt-2">
-            <h6 class="mb-0 text-muted">
-                Timeline
-            </h6>
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+            <MudStack Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                    <div>
+                        <MudText Typo="Typo.subtitle1">Timeline</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Important admission, transfer, and clinical milestone dates.
+                        </MudText>
+                    </div>
 
-            <button type="button"
-                    class="btn btn-outline-primary btn-sm"
-                    @onclick="HandleAddTimelineEventAsync"
-                    disabled="@IsSaving">
-                + Add Event
-            </button>
-        </div>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Disabled="@IsSaving"
+                               OnClick="HandleAddTimelineEventAsync">
+                        Add
+                    </MudButton>
+                </MudStack>
 
-        @if (OrderedDateEvents.Any())
-        {
-            <EditForm EditContext="TimelineEditContext">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
+                @if (OrderedDateEvents.Any())
+                {
+                    <EditForm EditContext="TimelineEditContext">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
 
-                <div class="vstack gap-2">
-                    @for (var i = 0; i < OrderedDateEvents.Count; i++)
-                    {
-                        var item = OrderedDateEvents[i];
+                        <MudStack Spacing="2">
+                            @for (var i = 0; i < OrderedDateEvents.Count; i++)
+                            {
+                                var item = OrderedDateEvents[i];
 
-                        <div class="card">
-                            <div class="card-body p-2 p-sm-3">
+                                <MudPaper @key="item" Elevation="0" Outlined="true" Class="pa-3">
+                                    <MudStack Spacing="2">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                                            <MudChip T="string"
+                                                     Size="Size.Small"
+                                                     Color="Color.Default"
+                                                     Variant="Variant.Outlined">
+                                                Event @(i + 1)
+                                            </MudChip>
 
-                                <div class="row g-2">
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Error"
+                                                       Size="Size.Small"
+                                                       Disabled="@IsSaving"
+                                                       OnClick="() => HandleRemoveTimelineEventAsync(item)">
+                                                Delete Date
+                                            </MudButton>
+                                        </MudStack>
 
-                                    @*
-                                        Event date is always a fixed-length value,
-                                        so it gets a narrower column.
-                                    *@
-                                    <div class="col-8 col-sm-5 col-md-3">
-                                        <div class="form-floating">
-                                            <InputDate class="form-control"
-                                                       id="@($"timelineDate_{i}")"
-                                                       @bind-Value="item.EventDate" />
+                                        <MudGrid Spacing="2">
+                                            @* MudDatePicker uses DateTime? internally.
+                                               The helper method below keeps this safe and still notifies
+                                               TimelineEditContext so the parent dirty flag works. *@
+                                            <MudItem xs="12" sm="4">
+                                                <MudDatePicker Label="Event date"
+                                                               Variant="Variant.Outlined"
+                                                               Margin="Margin.Dense"
+                                                               Date="@GetTimelineEventDate(item)"
+                                                               DateChanged="@(date => HandleTimelineDateChangedAsync(item, date))"
+                                                               Disabled="@IsSaving"
+                                                               Editable="true" />
+                                            </MudItem>
 
-                                            <label for="@($"timelineDate_{i}")">
-                                                Event Date
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    @*
-                                        Event title can take the remaining width.
-                                    *@
-                                    <div class="col-12 col-md">
-                                        <div class="form-floating">
-                                            <InputText class="form-control"
-                                                       id="@($"timelineTitle_{i}")"
-                                                       placeholder=" "
-                                                       @bind-Value="item.Title" />
-
-                                            <label for="@($"timelineTitle_{i}")">
-                                                Title
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    @*
-                                        Remove button kept like the old version:
-                                        after the input fields, not beside the date.
-                                    *@
-                                    <div class="col-12">
-                                        <button type="button"
-                                                class="btn btn-outline-danger btn-sm"
-                                                @onclick="() => HandleRemoveTimelineEventAsync(item)"
-                                                disabled="@IsSaving">
-                                            Delete Date
-                                        </button>
-                                    </div>
-
-                                </div>
-
-                            </div>
-                        </div>
-                    }
-                </div>
-            </EditForm>
-        }
-        else
-        {
-            <div class="alert alert-light border mb-0">
-                No timeline events added yet.
-            </div>
-        }
-
-    </div>
+                                            <MudItem xs="12" sm="8">
+                                                <MudTextField T="string"
+                                                              Label="Title"
+                                                              Variant="Variant.Outlined"
+                                                              Margin="Margin.Dense"
+                                                              FullWidth="true"
+                                                              Immediate="true"
+                                                              Disabled="@IsSaving"
+                                                              Value="@item.Title"
+                                                              ValueChanged="@(value => HandleTimelineTitleChangedAsync(item, value))" />
+                                            </MudItem>
+                                        </MudGrid>
+                                    </MudStack>
+                                </MudPaper>
+                            }
+                        </MudStack>
+                    </EditForm>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                        No timeline events added yet.
+                    </MudAlert>
+                }
+            </MudStack>
+        </MudPaper>
+    </MudStack>
 }
 
 @code {
@@ -292,7 +305,7 @@
     [Parameter, EditorRequired]
     public Patient Patient { get; set; } = default!;
 
-    // This shared catalog fills the Admission Unit dropdown and the AdmissionUnitsManager modals.
+    // This shared catalog fills the Admission Unit dropdown and the AdmissionUnitsManager component.
     [Parameter, EditorRequired]
     public List<AdmissionUnitCatalog> AdmissionUnits { get; set; } = new();
 
@@ -315,6 +328,12 @@
     [Parameter]
     public bool IsSaving { get; set; }
 
+    // OverviewSection does not own the Save button or the official dirty state.
+    // It only tells PatientDetails.razor: "Something in Overview changed."
+    // PatientDetails.razor will then mark the Overview section as dirty.
+    [Parameter]
+    public EventCallback OnSectionChanged { get; set; }
+
     // The parent page still owns timeline row creation.
     // This component only displays the button and forwards the click.
     [Parameter, EditorRequired]
@@ -330,15 +349,104 @@
     private string? admissionUnitStatusMessage;
 
     // This forwards the add-timeline-row request to PatientDetails.razor.
-    private Task HandleAddTimelineEventAsync()
+    // Adding a timeline row changes the Overview section, so we also notify the parent.
+    private async Task HandleAddTimelineEventAsync()
     {
-        return OnAddTimelineEvent.InvokeAsync();
+        await OnAddTimelineEvent.InvokeAsync();
+        await NotifyOverviewChangedAsync();
     }
 
     // This forwards the remove-timeline-row request to PatientDetails.razor.
-    private Task HandleRemoveTimelineEventAsync(PatientDateEvent item)
+    // Removing a timeline row changes the Overview section, so we also notify the parent.
+    private async Task HandleRemoveTimelineEventAsync(PatientDateEvent item)
     {
-        return OnRemoveTimelineEvent.InvokeAsync(item);
+        await OnRemoveTimelineEvent.InvokeAsync(item);
+        await NotifyOverviewChangedAsync();
+    }
+
+    // These small handlers replace plain @bind-Value.
+    //
+    // Why?
+    // MudBlazor updates the value correctly, but the parent PatientDetails.razor
+    // should also receive a clear "Overview changed" notification.
+    // This keeps dirty tracking explicit and easy to debug.
+    private async Task HandlePatientNameChangedAsync(string value)
+    {
+        Patient.Name = value;
+        OverviewEditContext.NotifyFieldChanged(new FieldIdentifier(Patient, nameof(Patient.Name)));
+        await NotifyOverviewChangedAsync();
+    }
+
+    private async Task HandlePatientBedChangedAsync(string value)
+    {
+        Patient.Bed = value;
+        OverviewEditContext.NotifyFieldChanged(new FieldIdentifier(Patient, nameof(Patient.Bed)));
+        await NotifyOverviewChangedAsync();
+    }
+
+    private async Task HandlePatientAgeChangedAsync(int? value)
+    {
+        Patient.Age = value;
+        OverviewEditContext.NotifyFieldChanged(new FieldIdentifier(Patient, nameof(Patient.Age)));
+        await NotifyOverviewChangedAsync();
+    }
+
+    private async Task HandlePatientWeightChangedAsync(decimal? value)
+    {
+        Patient.Weight = value;
+        OverviewEditContext.NotifyFieldChanged(new FieldIdentifier(Patient, nameof(Patient.Weight)));
+        await NotifyOverviewChangedAsync();
+    }
+
+    private async Task HandlePatientDiagnosisChangedAsync(string value)
+    {
+        Patient.Diagnosis = value;
+        OverviewEditContext.NotifyFieldChanged(new FieldIdentifier(Patient, nameof(Patient.Diagnosis)));
+        await NotifyOverviewChangedAsync();
+    }
+
+    private async Task HandleAdmissionUnitSelectionChangedAsync(int? value)
+    {
+        Patient.AdmissionUnitCatalogId = value;
+        OverviewEditContext.NotifyFieldChanged(new FieldIdentifier(Patient, nameof(Patient.AdmissionUnitCatalogId)));
+        await NotifyOverviewChangedAsync();
+    }
+
+    // MudDatePicker stores dates as nullable DateTime values.
+    // This helper keeps the markup simple and works whether the event date is already set or not.
+    private static DateTime? GetTimelineEventDate(PatientDateEvent item)
+    {
+        return item.EventDate;
+    }
+
+    // We manually update the timeline event date because MudDatePicker uses DateTime?.
+    // After changing the value, we notify both:
+    // 1) TimelineEditContext, for normal Blazor validation/field-change tracking.
+    // 2) PatientDetails.razor, so the bottom Save button can become enabled.
+    private async Task HandleTimelineDateChangedAsync(PatientDateEvent item, DateTime? selectedDate)
+    {
+        item.EventDate = selectedDate ?? DateTime.Today;
+
+        TimelineEditContext.NotifyFieldChanged(new FieldIdentifier(item, nameof(item.EventDate)));
+
+        await NotifyOverviewChangedAsync();
+    }
+
+    private async Task HandleTimelineTitleChangedAsync(PatientDateEvent item, string value)
+    {
+        item.Title = value;
+
+        TimelineEditContext.NotifyFieldChanged(new FieldIdentifier(item, nameof(item.Title)));
+
+        await NotifyOverviewChangedAsync();
+    }
+
+    // Central helper for this section.
+    // The section does not decide what "dirty" means globally.
+    // It only reports a local change to the parent page.
+    private Task NotifyOverviewChangedAsync()
+    {
+        return OnSectionChanged.InvokeAsync();
     }
 
     // This receives the refreshed catalog list from AdmissionUnitsManager.

@@ -1,272 +1,259 @@
 ﻿@page "/patients"
 @using IcuNotes.Models
 @using IcuNotes.Constants
+@using MudBlazor
 @inject IcuNotes.Services.PatientService PatientService
 
 <PageTitle>Patients</PageTitle>
 
 <!--
-    Patients.razor
-
-    This page is intentionally simple.
-
-    Its job is:
+    This page still has the next responsibilities:
     1) show active ICU patients
     2) allow quick creation of a new patient using only Name and Bed
     3) send the user to PatientDetails.razor for full editing
-    4) allow archiving a patient
-
-    UI approach in this version:
-    - The add-new-patient form is inside a modal.
-    - The patient list uses Bootstrap cards instead of a table.
-    - The page uses Bootstrap classes as much as possible.
-    - No custom CSS is used here.
-    - No Bootstrap JavaScript is required.
+    4) allow archiving a patient    
 -->
 
-<div class="container-fluid px-0">
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0">
+    <MudStack Spacing="3">
 
-    <!-- Page header -->
-    <div class="row g-2 align-items-center mb-3">
-        <div class="col-12 col-sm">
-            <h3 class="mb-1">Active Patients</h3>
+        <!-- Page header -->
+        <MudPaper Elevation="1" Class="rounded-lg">
+            <MudCardContent Class="py-3">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="8">
+                        <MudText Typo="Typo.h5">
+                            Active Patients
+                        </MudText>
 
-            <div class="text-muted small">
-                Quick list of currently active ICU patients
-            </div>
-        </div>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Quick list of currently active ICU patients
+                        </MudText>
+                    </MudItem>
 
-        <div class="col-12 col-sm-auto">
-            <!--
-                This opens a Blazor-controlled modal.
-
-                We are using Bootstrap modal CSS classes,
-                but we are NOT using Bootstrap modal JavaScript.
-            -->
-            <button type="button"
-                    class="btn btn-primary w-100"
-                    @onclick="OpenAddPatientModal">
-                + Add Patient
-            </button>
-        </div>
-    </div>
-
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="alert @statusCssClass">
-            @statusMessage
-        </div>
-    }
-
-    @if (patients.Count == 0)
-    {
-        <!-- Bootstrap card used as a simple empty state -->
-        <div class="card">
-            <div class="card-body text-center text-muted">
-                No active patients found.
-            </div>
-        </div>
-    }
-    else
-    {
-        <!--
-            Patient list.
-
-            We are using cards instead of a table because tables become cramped
-            on small mobile screens.
-
-            Each card only shows:
-            - Name
-            - Bed
-            - View / Edit button
-            - Archive button
-        -->
-        <div class="vstack gap-2">
-            @foreach (var patient in patients)
-            {
-                <div class="card">
-                    <div class="card-body py-3">
-
-                        <div class="row g-2 align-items-center">
-
-                            <!-- Patient name and bed -->
-                            <div class="col-12 col-sm">
-                                <div class="fw-semibold fs-5">
-                                    @patient.Name
-                                </div>
-
-                                @if (!string.IsNullOrWhiteSpace(patient.Bed))
-                                {
-                                    <span class="badge bg-light text-dark border">
-                                        Bed @patient.Bed
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-light text-muted border">
-                                        No bed
-                                    </span>
-                                }
-                            </div>
-
-                            <!-- View / Edit button -->
-                            <div class="col-6 col-sm-auto">
-                                <!--
-                                    PatientDetails.razor is the main page for editing.
-                                -->
-                                <a class="btn btn-sm btn-info w-100"
-                                       href="/patients/@patient.Id">
-                                    View / Edit
-                                </a>
-                            </div>
-
-                            <!-- Archive button -->
-                            <div class="col-6 col-sm-auto">
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-secondary w-100"
-                                        @onclick="() => ArchivePatient(patient.Id)">
-                                    Archive
-                                </button>
-                            </div>
-
-                        </div>
-
-                    </div>
-                </div>
-            }
-        </div>
-    }
-</div>
-
-@if (showAddPatientModal)
-{
-    <!--
-        Blazor-controlled Bootstrap-style modal.
-
-        Important:
-        Bootstrap normally expects JavaScript to open/close modals.
-
-        Here we avoid JavaScript by conditionally rendering the modal only when
-        showAddPatientModal is true.
-
-        The class "show d-block" makes the modal visible.
-    -->
-    <div class="modal fade show d-block"
-         tabindex="-1"
-         role="dialog"
-         aria-modal="true"
-         @onclick="CloseAddPatientModal">
-
-        <!--
-            modal-dialog-centered:
-            Keeps the modal vertically centered.
-
-            modal-dialog-scrollable:
-            Allows scrolling inside the modal if the screen is small.
-
-            @onclick:stopPropagation:
-            Prevents clicks inside the modal from closing it.
-            Clicking outside the modal closes it.
-        -->
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"
-             @onclick:stopPropagation="true">
-
-            <div class="modal-content">
-
-                <div class="modal-header">
-                    <div>
-                        <h5 class="modal-title">Add New Patient</h5>
-
-                        <div class="text-muted small">
-                            Only name and bed are needed here.
-                        </div>
-                    </div>
-
-                    <button type="button"
-                            class="btn-close"
-                            aria-label="Close"
-                            @onclick="CloseAddPatientModal">
-                    </button>
-                </div>
-
-                <EditForm Model="newPatientModel" OnValidSubmit="HandleValidSubmit">
-                    <DataAnnotationsValidator />
-
-                    <div class="modal-body">
-
+                    <MudItem xs="12" sm="4">
                         <!--
-                            ValidationSummary shows validation errors from the Patient model.
-                            For example, if Name is required and left empty.
-                        -->
-                        <ValidationSummary />
-
-                        <div class="mb-3">
-                            <label class="form-label">Name</label>
-
-                            <InputText class="form-control"
-                                       placeholder="Patient name"
-                                       @bind-Value="newPatientModel.Name" />
-
-                            <ValidationMessage For="@(() => newPatientModel.Name)" />
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Bed</label>
-
-                            <InputSelect class="form-select"
-                                         @bind-Value="newPatientModel.Bed">
-                                <option value="">-- Select Bed --</option>
-
-                                @foreach (var bed in BedOptions.All)
-                                {
-                                    <option value="@bed">@bed</option>
-                                }
-                            </InputSelect>
-
-                            <ValidationMessage For="@(() => newPatientModel.Bed)" />
-                        </div>
-
-                    </div>
-
-                    <div class="modal-footer">
-
-                        <button type="submit"
-                                class="btn btn-primary">
+                        Opens a MudBlazor drawer instead of a Bootstrap modal.
+                        No JavaScript is needed.
+                    -->
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="OpenAddPatientPanel">
                             Add Patient
-                        </button>
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+                </MudCardContent>
+            
+        </MudPaper>
 
-                        <button type="button"
-                                class="btn btn-outline-secondary"
-                                @onclick="ClearForm">
-                            Clear
-                        </button>
+        @if (!string.IsNullOrWhiteSpace(statusMessage))
+        {
+            <MudAlert Severity="statusSeverity"
+                      Variant="Variant.Filled"
+                      Dense="true">
+                @statusMessage
+            </MudAlert>
+        }
 
-                        <button type="button"
-                                class="btn btn-secondary"
-                                @onclick="CloseAddPatientModal">
-                            Cancel
-                        </button>
+        @if (patients.Count == 0)
+        {
+            <!-- Empty state -->
+            <MudPaper Elevation="0" Class="pa-6 rounded-lg">
+                <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.PersonOff"
+                             Size="Size.Large"
+                             Color="Color.Secondary" />
 
-                    </div>
-                </EditForm>
+                    <MudText Typo="Typo.body1" Color="Color.Secondary">
+                        No active patients found.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        }
+        else
+        {
+            <!--
+                Patient list.
 
-            </div>
-        </div>
-    </div>
+                Cards are still better than a table on mobile screens.
+                MudBlazor cards give us a cleaner Material Design look.
+            -->
+            <MudStack Spacing="2">
+                @foreach (var patient in patients)
+                {
+                    <MudCard Elevation="1" Class="rounded-lg">
+                        <MudCardContent Class="py-3">
+                            <MudGrid Spacing="2">
 
-    <!--
-        Bootstrap modal backdrop.
+                                <!-- Patient name and bed -->
+                                <MudItem xs="12" sm="6">
+                                    <MudStack Spacing="1">
+                                        <MudText Typo="Typo.h6">
+                                            @patient.Name
+                                        </MudText>
 
-        This is only the dark background layer.
-        It is rendered manually because we are not using Bootstrap JavaScript.
-    -->
-    <div class="modal-backdrop fade show"></div>
-}
+                                        @if (!string.IsNullOrWhiteSpace(patient.Bed))
+                                        {
+                                            <MudChip T="string"
+                                                     Size="Size.Small"
+                                                     Variant="Variant.Outlined"
+                                                     Color="Color.Primary">
+                                                Bed @patient.Bed
+                                            </MudChip>
+                                        }
+                                        else
+                                        {
+                                            <MudChip T="string"
+                                                     Size="Size.Small"
+                                                     Variant="Variant.Outlined"
+                                                     Color="Color.Secondary">
+                                                No bed
+                                            </MudChip>
+                                        }
+                                    </MudStack>
+                                </MudItem>
+
+                                <!-- View / Edit button -->
+                                <MudItem xs="6" sm="3">
+                                    <!-- PatientDetails.razor is the main page for editing. -->
+                                    <MudButton Href="@($"/patients/{patient.Id}")"
+                                               Variant="Variant.Filled"
+                                               Color="Color.Info"
+                                               Size="Size.Small"
+                                               FullWidth="true"
+                                               StartIcon="@Icons.Material.Filled.Edit">
+                                        View / Edit
+                                    </MudButton>
+                                </MudItem>
+
+                                <!-- Archive button -->
+                                <MudItem xs="6" sm="3">
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Secondary"
+                                               Size="Size.Small"
+                                               FullWidth="true"
+                                               StartIcon="@Icons.Material.Filled.Archive"
+                                               OnClick="() => ArchivePatient(patient.Id)">
+                                        Archive
+                                    </MudButton>
+                                </MudItem>
+
+                            </MudGrid>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudStack>
+        }
+    </MudStack>
+</MudContainer>
+
+<!--
+    Add Patient panel.
+
+    This replaces the Bootstrap modal.
+    A bottom drawer works well on phones because the form appears near the thumb area.
+-->
+<MudDrawer @bind-Open="showAddPatientPanel"
+           Anchor="Anchor.Bottom"
+           Variant="DrawerVariant.Temporary"
+           Elevation="8">
+
+    <MudPaper Elevation="0" Class="pa-4">
+        <MudStack Spacing="3">
+
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <div>
+                    <MudText Typo="Typo.h6">
+                        Add New Patient
+                    </MudText>
+
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Only name and bed are needed here.
+                    </MudText>
+                </div>
+
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                               Color="Color.Default"
+                               Edge="Edge.End"
+                               OnClick="CloseAddPatientPanel" />
+            </MudStack>
+
+            <EditForm Model="newPatientModel" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+
+                <MudStack Spacing="3">
+                    <!--
+                        ValidationSummary shows validation errors from the Patient model.
+                        For example, if Name is required and left empty.
+                    -->
+                    <ValidationSummary />
+
+                    <MudTextField T="string"
+                                  Label="Name"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Immediate="true"
+                                  @bind-Value="newPatientModel.Name"
+                                  For="@(() => newPatientModel.Name)" />
+
+                    <MudSelect T="string"
+                               Label="Bed"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Clearable="true"
+                               @bind-Value="newPatientModel.Bed"
+                               For="@(() => newPatientModel.Bed)">
+
+                        @foreach (var bed in BedOptions.All)
+                        {
+                            <MudSelectItem T="string" Value="@bed">
+                                @bed
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="4">
+                            <MudButton ButtonType="ButtonType.Submit"
+                                       Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       StartIcon="@Icons.Material.Filled.Save">
+                                Add Patient
+                            </MudButton>
+                        </MudItem>
+
+                        <MudItem xs="6" sm="4">
+                            <MudButton ButtonType="ButtonType.Button"
+                                       Variant="Variant.Outlined"
+                                       Color="Color.Secondary"
+                                       FullWidth="true"
+                                       OnClick="ClearForm">
+                                Clear
+                            </MudButton>
+                        </MudItem>
+
+                        <MudItem xs="6" sm="4">
+                            <MudButton ButtonType="ButtonType.Button"
+                                       Variant="Variant.Text"
+                                       Color="Color.Secondary"
+                                       FullWidth="true"
+                                       OnClick="CloseAddPatientPanel">
+                                Cancel
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudStack>
+            </EditForm>
+
+        </MudStack>
+    </MudPaper>
+</MudDrawer>
 
 @code {
-    // CSS class used by the status message area.
-    private string statusCssClass = "alert-info";
-
     // List of active patients shown on the page.
     private List<Patient> patients = new();
 
@@ -277,8 +264,11 @@
     // Simple feedback message shown to the user.
     private string? statusMessage;
 
-    // Controls whether the Add Patient modal is visible.
-    private bool showAddPatientModal;
+    // MudBlazor alert severity used by the status message area.
+    private Severity statusSeverity = Severity.Info;
+
+    // Controls whether the Add Patient bottom drawer is visible.
+    private bool showAddPatientPanel;
 
     protected override async Task OnInitializedAsync()
     {
@@ -301,24 +291,24 @@
         patients = await PatientService.GetAllAsync();
     }
 
-    private void OpenAddPatientModal()
+    private void OpenAddPatientPanel()
     {
         /*
-            Start with a fresh model every time the modal opens.
+            Start with a fresh model every time the panel opens.
 
             This prevents old typed values from appearing if the user
-            opened the modal before and then cancelled.
+            opened the panel before and then cancelled.
         */
         newPatientModel = new Patient();
 
-        // Show the modal.
-        showAddPatientModal = true;
+        // Show the Add Patient panel.
+        showAddPatientPanel = true;
     }
 
-    private void CloseAddPatientModal()
+    private void CloseAddPatientPanel()
     {
-        // Hide the modal.
-        showAddPatientModal = false;
+        // Hide the Add Patient panel.
+        showAddPatientPanel = false;
 
         // Clear any typed values.
         ClearForm();
@@ -330,10 +320,10 @@
         newPatientModel = new Patient();
     }
 
-    private void SetStatus(string message, string cssClass = "alert-info")
+    private void SetStatus(string message, Severity severity = Severity.Info)
     {
         statusMessage = message;
-        statusCssClass = cssClass;
+        statusSeverity = severity;
     }
 
     private async Task HandleValidSubmit()
@@ -344,13 +334,13 @@
         */
         await PatientService.AddAsync(newPatientModel);
 
-        SetStatus("Patient added successfully.", "alert-success");
+        SetStatus("Patient added successfully.", Severity.Success);
 
         // Refresh the list so the new patient appears.
         await LoadPatientsAsync();
 
-        // Close the modal after successful add.
-        showAddPatientModal = false;
+        // Close the panel after successful add.
+        showAddPatientPanel = false;
 
         // Prepare a clean model for the next patient.
         ClearForm();
@@ -364,6 +354,6 @@
         // Refresh the list after archiving.
         await LoadPatientsAsync();
 
-        SetStatus("Patient archived successfully.", "alert-success");
+        SetStatus("Patient archived successfully.", Severity.Success);
     }
 }

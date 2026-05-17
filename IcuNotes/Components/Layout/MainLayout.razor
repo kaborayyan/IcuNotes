@@ -1,149 +1,283 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="min-vh-100 d-flex flex-column bg-light">
+<!--
+    MudBlazor providers.
+
+    These are placed in the main layout so MudBlazor services are available
+    throughout the whole app.
+
+    Important:
+    - The theme provider receives our app theme and dark-mode setting.
+    - No database, model, service, or page logic is changed in this file.
+-->
+<MudThemeProvider Theme="@AppTheme" IsDarkMode="@_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<!--
+    MudLayout is the MudBlazor replacement for the old Bootstrap layout wrapper.
+
+    It gives us a proper app shell made from:
+    - MudAppBar for the top bar
+    - MudDrawer for the left side menu
+    - MudMainContent for the page body
+-->
+<MudLayout Class="@RootLayoutClass" Style="@SafeAreaStyle">
 
     <!--
-        Compact Bootstrap navbar.
+        Top app bar.
 
-        Most of the layout is Bootstrap:
-        - navbar
-        - navbar-dark
-        - bg-dark
-        - sticky-top
-        - px / py spacing utilities
+        The hamburger button opens the MudDrawer using normal Blazor state.
+        No extra JavaScript is used.
 
-        app-safe-top is the only small custom helper.
-        It protects the navbar from the Android status bar.
+        Important:
+        The app bar is fixed again, but the old phone-width padding fallback
+        has been removed. MudMainContent can now reserve the normal app-bar
+        height without creating extra dead space.
     -->
-    <header class="navbar navbar-dark bg-dark sticky-top px-2 py-1 app-safe-top">
-        <div class="container-fluid px-0">
+    <MudAppBar Color="Color.Primary"
+               Elevation="1"
+               Fixed="true"
+               Class="app-safe-top">
 
-            <!--
-                Hamburger button.
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       OnClick="ToggleDrawer"
+                       AriaLabel="Open navigation menu" />
 
-                This opens the side menu using Blazor state.
-                No JavaScript is used.
-            -->
-            <button class="btn btn-dark btn-sm px-2 py-1 me-2"
-                    type="button"
-                    @onclick="OpenMenu"
-                    aria-label="Open navigation menu">
-                ☰
-            </button>
+        <MudText Typo="Typo.h6"
+                 Class="app-title">
+            ICU Notes
+        </MudText>
 
-            <span class="navbar-brand mb-0 fs-6">
-                ICU Notes
-            </span>
+        <MudSpacer />
 
-        </div>
-    </header>
-
-    @if (isMenuOpen)
-    {
         <!--
-            Bootstrap-style offcanvas backdrop.
+            Light/dark theme toggle.
 
-            We render it manually because we are not using Bootstrap JavaScript.
+            This only changes the visual theme.
+            It does not change saved data or app logic.
         -->
-        <div class="offcanvas-backdrop fade show"
-             @onclick="CloseMenu">
-        </div>
-    }
+        <MudIconButton Icon="@ThemeIcon"
+                       Color="Color.Inherit"
+                       OnClick="ToggleTheme"
+                       AriaLabel="@ThemeButtonLabel" />
+
+    </MudAppBar>
 
     <!--
-        Bootstrap offcanvas menu.
+        Left navigation drawer.
 
-        Bootstrap normally opens/closes this with JavaScript.
-        Here Blazor controls it by adding/removing the "show" class.
-
-        This avoids JavaScript while still using Bootstrap's offcanvas styling.
+        DrawerVariant.Temporary is mobile-friendly because it slides over the page
+        and closes easily after navigation.
     -->
-    <aside class="offcanvas offcanvas-start @(isMenuOpen ? "show" : "")"
-           tabindex="-1"
-           aria-labelledby="sideMenuTitle">
+    <MudDrawer @bind-Open="_drawerOpen"
+               Variant="@DrawerVariant.Temporary"
+               Anchor="@Anchor.Start"
+               Elevation="2">
 
-        <div class="offcanvas-header bg-dark text-white py-2 app-safe-top">
-            <h5 class="offcanvas-title fs-6"
-                id="sideMenuTitle">
+        <MudDrawerHeader Class="app-safe-top">
+            <MudText Typo="Typo.h6">
                 Menu
-            </h5>
+            </MudText>
+        </MudDrawerHeader>
 
-            <button type="button"
-                    class="btn-close btn-close-white"
-                    aria-label="Close navigation menu"
-                    @onclick="CloseMenu">
-            </button>
-        </div>
+        <!--
+            MudNavMenu gives us Material-style navigation links.
+            Routes are unchanged from the old layout.
+        -->
+        <MudNavMenu Dense="true"
+                    Class="app-nav-menu">
 
-        <div class="offcanvas-body p-2">
+            <MudNavLink Href="/"
+                        Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Home"
+                        OnClick="CloseDrawer">
+                Home
+            </MudNavLink>
 
-            <!--
-                Bootstrap list-group gives us clean menu links
-                without custom CSS.
-            -->
-            <nav class="list-group list-group-flush">
-                <a class="list-group-item list-group-item-action"
-                       href="/"
-                       @onclick="CloseMenu">
-                    Home
-                </a>
+            <MudNavLink Href="/patients"
+                        Icon="@Icons.Material.Filled.People"
+                        OnClick="CloseDrawer">
+                Active Patients
+            </MudNavLink>
 
-                <a class="list-group-item list-group-item-action"
-                       href="/patients"
-                       @onclick="CloseMenu">
-                    Active Patients
-                </a>
+            <MudNavLink Href="/archived-patients"
+                        Icon="@Icons.Material.Filled.Inventory2"
+                        OnClick="CloseDrawer">
+                Archived Patients
+            </MudNavLink>
 
-                <a class="list-group-item list-group-item-action"
-                       href="/archived-patients"
-                       @onclick="CloseMenu">
-                    Archived Patients
-                </a>
-            </nav>
+        </MudNavMenu>
 
-        </div>
-    </aside>
+    </MudDrawer>
 
-    <main class="flex-fill p-3">
-        @Body
-    </main>
-</div>
+    <!--
+        Main page content.
+
+        Existing pages continue to render through @Body.
+        This means we can migrate the app gradually, one page at a time.
+
+        Because the app bar is fixed, MudMainContent reserves the standard
+        MudBlazor app-bar height. We avoid adding our own manual top padding.
+    -->
+    <MudMainContent Class="app-main-content">
+        <MudContainer MaxWidth="MaxWidth.False"
+                      Class="app-body-container">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+
+</MudLayout>
 
 @code {
-    // Tracks whether the left side menu is currently visible.
-    private bool isMenuOpen = false;
+    // Tracks whether the left side navigation drawer is visible.
+    private bool _drawerOpen = false;
 
-    private void OpenMenu()
+    // Tracks whether the app is currently using the dark theme.
+    // For now this resets when the app restarts.
+    // Later we can persist it using Preferences if you want.
+    private bool _isDarkMode = false;
+
+    // Android WebView often does not report env(safe-area-inset-top) correctly.
+    // We therefore apply a small Android-only top safe-area value from C#.
+    // This avoids the old width-based CSS rule that also affected Windows when
+    // the window was resized to phone width. No JavaScript is needed.
+    private const string AndroidSafeAreaTop = "24px";
+
+    // Adds an Android class only when the app is really running on Android.
+    // Windows phone-width testing will not receive the Android spacing.
+    private string RootLayoutClass => OperatingSystem.IsAndroid()
+        ? "app-root app-android"
+        : "app-root";
+
+    // Exposes the safe-area value as a CSS variable used by the style block below.
+    private string SafeAreaStyle => OperatingSystem.IsAndroid()
+        ? $"--app-safe-top: {AndroidSafeAreaTop};"
+        : "--app-safe-top: env(safe-area-inset-top, 0px);";
+
+    // The icon changes depending on the current theme.
+    // Brightness7 suggests switching back to light mode.
+    // Brightness4 suggests switching to dark mode.
+    private string ThemeIcon => _isDarkMode
+        ? Icons.Material.Filled.Brightness7
+        : Icons.Material.Filled.Brightness4;
+
+    // A readable label for screen readers and accessibility tools.
+    private string ThemeButtonLabel => _isDarkMode
+        ? "Switch to light theme"
+        : "Switch to dark theme";
+
+    // App-wide MudBlazor theme.
+    // We keep it here for now because MainLayout owns the app shell.
+    // Later, if the theme grows, we can move it into a separate theme helper class.
+    private readonly MudTheme AppTheme = new()
     {
-        isMenuOpen = true;
+        PaletteLight = new PaletteLight()
+        {
+            Primary = Colors.Blue.Darken2,
+            Secondary = Colors.Cyan.Darken1,
+            Background = Colors.Gray.Lighten5,
+            Surface = Colors.Shades.White,
+            AppbarBackground = Colors.Blue.Darken2,
+            AppbarText = Colors.Shades.White,
+            DrawerBackground = Colors.Shades.White,
+            DrawerText = Colors.Gray.Darken4
+        },
+
+        PaletteDark = new PaletteDark()
+        {
+            Primary = Colors.Blue.Lighten1,
+            Secondary = Colors.Cyan.Lighten1,
+            Background = "#121212",
+            Surface = "#1E1E1E",
+            AppbarBackground = "#1F2937",
+            AppbarText = Colors.Shades.White,
+            DrawerBackground = "#1E1E1E",
+            DrawerText = Colors.Gray.Lighten3
+        },
+
+        LayoutProperties = new LayoutProperties()
+        {
+            DefaultBorderRadius = "12px"
+        }
+    };
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
     }
 
-    private void CloseMenu()
+    private void CloseDrawer()
     {
-        isMenuOpen = false;
+        _drawerOpen = false;
+    }
+
+    private void ToggleTheme()
+    {
+        _isDarkMode = !_isDarkMode;
     }
 }
 
 <style>
     /*
-            Minimal custom CSS.
+            Minimal safe-area CSS.
 
-            Bootstrap handles almost everything else.
+            Important:
+            The old phone-width fallback used media (max-width: 768px).
+    That was wrong because it also affected Windows when we resized the
+    app to a phone-like width.
 
-            This class protects the top navbar and offcanvas header from
-            the Android status bar area.
-        */
+    This version uses a CSS variable from C#:
+    - Android gets a small 24px fallback.
+    - Windows keeps the normal env(safe-area-inset-top, 0px) value.
+    */
     .app-safe-top {
-        padding-top: calc(0.25rem + env(safe-area-inset-top, 0px)) !important;
+        padding-top: var(--app-safe-top, 0px) !important;
     }
 
     /*
-            Some Android WebViews do not report safe-area-inset-top properly.
-            This fallback keeps a small safe top space on phone-sized screens.
+            On Android only, the app bar becomes taller because of the safe-area
+            padding above. MudMainContent normally reserves only the standard
+            app-bar height, so we add the same safe-area value to the content
+            offset to prevent the page title from hiding under the app bar.
         */
-    @@media (max-width: 768px) {
-        .app-safe-top {
-            padding-top: calc(0.25rem + max(env(safe-area-inset-top, 0px), 24px)) !important;
-        }
+    .app-root.app-android .app-main-content {
+        padding-top: calc(var(--mud-appbar-height, 64px) + var(--app-safe-top, 0px)) !important;
+    }
+
+    /*
+            Small spacing for the app title without using Bootstrap-style utility classes.
+        */
+    .app-title {
+        margin-left: 8px;
+    }
+
+    /*
+            Small horizontal padding for the drawer navigation links.
+        */
+    .app-nav-menu {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    /*
+            Keep the page background aligned with the selected MudBlazor theme.
+        */
+    .app-main-content {
+        min-height: 100vh;
+        background-color: var(--mud-palette-background);
+        color: var(--mud-palette-text-primary);
+    }
+
+    /*
+            Mobile-first page spacing.
+            The bottom padding protects content from phone gesture bars and safe-area insets.
+        */
+    .app-body-container {
+        padding: 12px;
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
     }
 </style>

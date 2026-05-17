@@ -2,6 +2,7 @@
 using IcuNotes.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MudBlazor.Services;
 
 namespace IcuNotes
 {
@@ -29,22 +30,26 @@ namespace IcuNotes
                 options.UseSqlite($"Data Source={databasePath}");
             });
 
-            // You can register your own services here later.
-            // Example:
-            // builder.Services.AddScoped<PatientService>();
+            // Register your own app services here.
             builder.Services.AddSingleton<PatientService>();
 
+            // Register MudBlazor services.
+            // This is needed for MudBlazor features such as dialogs, snackbars,
+            // popovers, and other interactive Material Design components.
+            builder.Services.AddMudServices();
+
+            // Register the MAUI Blazor WebView.
             builder.Services.AddMauiBlazorWebView();
 
 #if DEBUG
-    		builder.Services.AddBlazorWebViewDeveloperTools();
-    		builder.Logging.AddDebug();
+            builder.Services.AddBlazorWebViewDeveloperTools();
+            builder.Logging.AddDebug();
 #endif
 
             var app = builder.Build();
 
-            // Create the database file and tables if they do not exist yet.
-            // This is useful while starting the project.
+            // Apply EF Core migrations when the app starts.
+            // This keeps the SQLite database schema aligned with your migrations.
             using (var scope = app.Services.CreateScope())
             {
                 var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();

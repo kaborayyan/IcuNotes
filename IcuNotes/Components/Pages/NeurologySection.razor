@@ -3,291 +3,346 @@
 @using Microsoft.AspNetCore.Components.Forms
 
 @* This component contains the Neurology section UI.
-   It uses Bootstrap for a compact, mobile-friendly layout.
-   It also uses the shared MedicationsManager component for catalog add/edit work.
-   The parent page still owns patient saving, dirty tracking, and patient reload. *@
+   The parent PatientDetails page still owns:
+   - patient loading
+   - dirty tracking
+   - saving
+   - reloading
+
+   This file focuses only on the visible Neurology form.*@
+
 @if (Patient is not null)
 {
-    @* The fixed bottom bar in PatientDetails now shows the saved/unsaved state.
-       This section only shows the Neurology title and fields. *@
-    <div class="card border-0 shadow-sm mb-3">
-        <div class="card-body p-2 p-sm-3">
-            <div class="mb-2">
-                <h6 class="mb-0">Neurology</h6>
-            </div>
-            
+    <EditForm EditContext="NeurologyEditContext">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
 
-            @* This form edits the neurology fields.
-               The parent PatientDetails page owns saving through the fixed bottom bar. *@
-            <EditForm EditContext="NeurologyEditContext">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
+        <MudStack Spacing="3">
 
-                @* This compact card contains the Glasgow Coma Scale selectors and total score display.
-                   Bootstrap floating labels keep the label inside the field area, saving vertical space. *@
-                <div class="card mb-2">
-                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
-                        <h6 class="mb-0">Glasgow Coma Scale</h6>
-                    </div>
+            @* Section title.
+               This gives the Neurology page a clear Material-style entry point
+               instead of copying the old design. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.h6">Neurology</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Glasgow Coma Scale, neurological examination, and neuro-related medications.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
 
-                    <div class="card-body p-2 p-sm-3">
-                        <div class="row g-2">
-                            <div class="col-12 col-sm-4">
-                                <div class="form-floating">
-                                    <InputSelect class="form-select"
-                                                 @bind-Value="Patient.Neurology!.GcsEye">
-                                        <option value="">Select</option>
+            @* Glasgow Coma Scale.
+               MudSelect is used for the three GCS response fields.
+               The selected enum values remain bound directly to Patient.Neurology. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                        <MudText Typo="Typo.subtitle1">Glasgow Coma Scale</MudText>
 
-                                        @foreach (var eye in Enum.GetValues<GcsEyeResponse>())
-                                        {
-                                            <option value="@eye">@GetEnumDisplayName(eye)</option>
-                                        }
-                                    </InputSelect>
-                                    <label>Eye</label>
-                                </div>
-                            </div>
-
-                            <div class="col-12 col-sm-4">
-                                <div class="form-floating">
-                                    <InputSelect class="form-select"
-                                                 @bind-Value="Patient.Neurology!.GcsVerbal">
-                                        <option value="">Select</option>
-
-                                        @foreach (var verbal in Enum.GetValues<GcsVerbalResponse>())
-                                        {
-                                            <option value="@verbal">@GetEnumDisplayName(verbal)</option>
-                                        }
-                                    </InputSelect>
-                                    <label>Verbal</label>
-                                </div>
-                            </div>
-
-                            <div class="col-12 col-sm-4">
-                                <div class="form-floating">
-                                    <InputSelect class="form-select"
-                                                 @bind-Value="Patient.Neurology!.GcsMotor">
-                                        <option value="">Select</option>
-
-                                        @foreach (var motor in Enum.GetValues<GcsMotorResponse>())
-                                        {
-                                            <option value="@motor">@GetEnumDisplayName(motor)</option>
-                                        }
-                                    </InputSelect>
-                                    <label>Motor</label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="alert alert-light border py-2 px-2 mt-2 mb-0 small">
-                            <span class="fw-semibold">GCS Total:</span>
-                            @if (Patient.Neurology.GcsTotal.HasValue)
-                            {
-                                <span>@Patient.Neurology.GcsTotal.Value</span>
-                            }
-                            else
-                            {
-                                <span class="text-muted">Complete all 3 GCS fields to calculate total.</span>
-                            }
-                        </div>
-                    </div>
-                </div>
-
-                @* These simple fields store the free-text pupil and motor exam notes.
-                   Text inputs need placeholder=" " for Bootstrap floating labels to work correctly. *@
-                <div class="card mb-2">
-                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
-                        <h6 class="mb-0">Examination</h6>
-                    </div>
-
-                    <div class="card-body p-2 p-sm-3">
-                        <div class="row g-2">
-                            <div class="col-12 col-sm-6">
-                                <div class="form-floating">
-                                    <InputText class="form-control"
-                                               placeholder=" "
-                                               @bind-Value="Patient.Neurology!.Pupils" />
-                                    <label>Pupils</label>
-                                </div>
-                            </div>
-
-                            <div class="col-12 col-sm-6">
-                                <div class="form-floating">
-                                    <InputText class="form-control"
-                                               placeholder=" "
-                                               @bind-Value="Patient.Neurology!.MotorStatus" />
-                                    <label>Motor Status</label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                @* This reusable manager handles adding and editing shared catalog medications.
-               Neurology stays focused only on neurology-specific medication rows. *@
-                <MedicationsManager Medications="Medications"
-                                    IsDisabled="IsSaving"
-                                    OnMedicationsChanged="HandleMedicationsChangedAsync"
-                                    OnStatusMessage="HandleStatusMessageAsync" />
-
-                @* This compact card edits the sedation medication list. *@
-                <div class="card mb-2">
-                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
-                        <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2">
-                            <h6 class="mb-0">Sedation Medications</h6>
-
-                            <div class="d-grid d-sm-block">
-                                <button type="button"
-                                        class="btn btn-outline-primary btn-sm"
-                                        @onclick="() => HandleAddNeurologyMedicationAsync(NeurologyMedicationCategory.Sedation)"
-                                        disabled="@IsSaving">
-                                    Add Sedation
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card-body p-2 p-sm-3">
-                        @if (GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Sedation).Any())
+                        @if (Patient.Neurology!.GcsTotal.HasValue)
                         {
-                            @foreach (var item in GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Sedation))
-                            {
-                                <div class="border rounded p-2 mb-2">
-                                    <div class="row g-2 align-items-stretch">
-                                        <div class="col-12 col-md-7">
-                                            <div class="form-floating">
-                                                <InputSelect class="form-select"
-                                                             @bind-Value="item.MedicationId">
-                                                    <option value="0">Select</option>
-
-                                                    @foreach (var medication in Medications)
-                                                    {
-                                                        <option value="@medication.Id">@medication.Name</option>
-                                                    }
-                                                </InputSelect>
-                                                <label>Medication</label>
-                                            </div>
-
-                                            @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
-                                            {
-                                                <div class="form-text small">
-                                                    Default frequency: @GetMedicationFrequency(item.MedicationId)
-                                                </div>
-                                            }
-                                        </div>
-
-                                        <div class="col-6 col-md-3">
-                                            <div class="form-floating">
-                                                <InputNumber TValue="decimal?"
-                                                             class="form-control"
-                                                             placeholder=" "
-                                                             @bind-Value="item.Dose" />
-                                                <label>Dose</label>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-6 col-md-2 d-grid">
-                                            <button type="button"
-                                                    class="btn btn-outline-danger btn-sm h-100"
-                                                    @onclick="() => HandleRemoveNeurologyMedicationAsync(item)"
-                                                    disabled="@IsSaving">
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
+                            <MudChip T="string"
+                                     Color="Color.Primary"
+                                     Variant="Variant.Filled"
+                                     Size="Size.Small">
+                                GCS @Patient.Neurology.GcsTotal.Value
+                            </MudChip>
                         }
                         else
                         {
-                            <div class="alert alert-light border py-2 px-2 mb-0 small">
-                                No sedation medications added yet.
-                            </div>
+                            <MudChip T="string"
+                                     Color="Color.Default"
+                                     Variant="Variant.Outlined"
+                                     Size="Size.Small">
+                                Incomplete
+                            </MudChip>
                         }
-                    </div>
-                </div>
+                    </MudStack>
 
-                @* This compact card edits the neuro medication list. *@
-                <div class="card mb-0">
-                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
-                        <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2">
-                            <h6 class="mb-0">Other Medications</h6>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="4">
+                            <MudSelect T="GcsEyeResponse?"
+                                       Label="Eye response"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       Disabled="@IsSaving"
+                                       Value="Patient.Neurology!.GcsEye"
+                                       ValueChanged="HandleGcsEyeChanged">
+                                <MudSelectItem T="GcsEyeResponse?" Value="@((GcsEyeResponse?)null)">
+                                    Select eye response
+                                </MudSelectItem>
 
-                            <div class="d-grid d-sm-block">
-                                <button type="button"
-                                        class="btn btn-outline-primary btn-sm"
-                                        @onclick="() => HandleAddNeurologyMedicationAsync(NeurologyMedicationCategory.Neuro)"
-                                        disabled="@IsSaving">
-                                    Add Medication
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                                @foreach (var eye in Enum.GetValues<GcsEyeResponse>())
+                                {
+                                    <MudSelectItem T="GcsEyeResponse?" Value="@((GcsEyeResponse?)eye)">
+                                        @GetEnumDisplayName(eye)
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
 
-                    <div class="card-body p-2 p-sm-3">
-                        @if (GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Neuro).Any())
+                        <MudItem xs="12" sm="4">
+                            <MudSelect T="GcsVerbalResponse?"
+                                       Label="Verbal response"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       Disabled="@IsSaving"
+                                       Value="Patient.Neurology!.GcsVerbal"
+                                       ValueChanged="HandleGcsVerbalChanged">
+                                <MudSelectItem T="GcsVerbalResponse?" Value="@((GcsVerbalResponse?)null)">
+                                    Select verbal response
+                                </MudSelectItem>
+
+                                @foreach (var verbal in Enum.GetValues<GcsVerbalResponse>())
+                                {
+                                    <MudSelectItem T="GcsVerbalResponse?" Value="@((GcsVerbalResponse?)verbal)">
+                                        @GetEnumDisplayName(verbal)
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudSelect T="GcsMotorResponse?"
+                                       Label="Motor response"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       Disabled="@IsSaving"
+                                       Value="Patient.Neurology!.GcsMotor"
+                                       ValueChanged="HandleGcsMotorChanged">
+                                <MudSelectItem T="GcsMotorResponse?" Value="@((GcsMotorResponse?)null)">
+                                    Select motor response
+                                </MudSelectItem>
+
+                                @foreach (var motor in Enum.GetValues<GcsMotorResponse>())
+                                {
+                                    <MudSelectItem T="GcsMotorResponse?" Value="@((GcsMotorResponse?)motor)">
+                                        @GetEnumDisplayName(motor)
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+
+                    @if (!Patient.Neurology.GcsTotal.HasValue)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            Complete eye, verbal, and motor responses to calculate the total GCS.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudPaper>
+
+            @* Examination.
+               MudTextField is used for the free-text examination fields. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.subtitle1">Neurological examination</MudText>
+
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField T="string"
+                                          Label="Pupils"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Disabled="@IsSaving"
+                                          Value="Patient.Neurology!.Pupils"
+                                          ValueChanged="HandlePupilsChanged" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField T="string"
+                                          Label="Motor status"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Disabled="@IsSaving"
+                                          Value="Patient.Neurology!.MotorStatus"
+                                          ValueChanged="HandleMotorStatusChanged" />
+                        </MudItem>
+                    </MudGrid>
+                </MudStack>
+            </MudPaper>
+
+            @* This reusable manager handles adding/editing the shared medication catalog.
+               It is a separate component, so its internal UI will be migrated later when we work on
+               MedicationsManager.razor. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.subtitle1">Medication catalog</MudText>
+
+                    <MedicationsManager Medications="Medications"
+                                        IsDisabled="IsSaving"
+                                        OnMedicationsChanged="HandleMedicationsChangedAsync"
+                                        OnStatusMessage="HandleStatusMessageAsync" />
+                </MudStack>
+            </MudPaper>
+
+            @* Sedation medications. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                        <MudText Typo="Typo.subtitle1">Sedation medications</MudText>
+
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Disabled="@IsSaving"
+                                   OnClick="() => HandleAddNeurologyMedicationAsync(NeurologyMedicationCategory.Sedation)">
+                            Add
+                        </MudButton>
+                    </MudStack>
+
+                    @if (GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Sedation).Any())
+                    {
+                        @foreach (var item in GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Sedation))
                         {
-                            @foreach (var item in GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Neuro))
-                            {
-                                <div class="border rounded p-2 mb-2">
-                                    <div class="row g-2 align-items-stretch">
-                                        <div class="col-12 col-md-7">
-                                            <div class="form-floating">
-                                                <InputSelect class="form-select"
-                                                             @bind-Value="item.MedicationId">
-                                                    <option value="0">Select</option>
+                            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" md="7">
+                                        <MudSelect T="int"
+                                                   Label="Medication"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   Disabled="@IsSaving"
+                                                   Value="item.MedicationId"
+                                                   ValueChanged="@(value => HandleMedicationIdChanged(item, value))">
+                                            <MudSelectItem T="int" Value="0">Select medication</MudSelectItem>
 
-                                                    @foreach (var medication in Medications)
-                                                    {
-                                                        <option value="@medication.Id">@medication.Name</option>
-                                                    }
-                                                </InputSelect>
-                                                <label>Medication</label>
-                                            </div>
-
-                                            @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                            @foreach (var medication in Medications)
                                             {
-                                                <div class="form-text small">
-                                                    Default frequency: @GetMedicationFrequency(item.MedicationId)
-                                                </div>
+                                                <MudSelectItem T="int" Value="@medication.Id">
+                                                    @medication.Name
+                                                </MudSelectItem>
                                             }
-                                        </div>
+                                        </MudSelect>
 
-                                        <div class="col-6 col-md-3">
-                                            <div class="form-floating">
-                                                <InputNumber TValue="decimal?"
-                                                             class="form-control"
-                                                             placeholder=" "
-                                                             @bind-Value="item.Dose" />
-                                                <label>Dose</label>
-                                            </div>
-                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                Default frequency: @GetMedicationFrequency(item.MedicationId)
+                                            </MudText>
+                                        }
+                                    </MudItem>
 
-                                        <div class="col-6 col-md-2 d-grid">
-                                            <button type="button"
-                                                    class="btn btn-outline-danger btn-sm h-100"
-                                                    @onclick="() => HandleRemoveNeurologyMedicationAsync(item)"
-                                                    disabled="@IsSaving">
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
+                                    <MudItem xs="7" md="3">
+                                        <MudNumericField T="decimal?"
+                                                         Label="Dose"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Disabled="@IsSaving"
+                                                         Value="item.Dose"
+                                                         ValueChanged="@(value => HandleMedicationDoseChanged(item, value))" />
+                                    </MudItem>
+
+                                    <MudItem xs="5" md="2">
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Error"
+                                                   FullWidth="true"
+                                                   StartIcon="@Icons.Material.Filled.Delete"
+                                                   Disabled="@IsSaving"
+                                                   OnClick="() => HandleRemoveNeurologyMedicationAsync(item)">
+                                            Remove
+                                        </MudButton>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
                         }
-                        else
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            No sedation medications added yet.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudPaper>
+
+            @* Other neuro medications. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                        <MudText Typo="Typo.subtitle1">Other medications</MudText>
+
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Disabled="@IsSaving"
+                                   OnClick="() => HandleAddNeurologyMedicationAsync(NeurologyMedicationCategory.Neuro)">
+                            Add
+                        </MudButton>
+                    </MudStack>
+
+                    @if (GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Neuro).Any())
+                    {
+                        @foreach (var item in GetNeurologyMedicationsByCategory(NeurologyMedicationCategory.Neuro))
                         {
-                            <div class="alert alert-light border py-2 px-2 mb-0 small">
-                                No other medications added yet.
-                            </div>
-                        }
-                    </div>
-                </div>
+                            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" md="7">
+                                        <MudSelect T="int"
+                                                   Label="Medication"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   Disabled="@IsSaving"
+                                                   Value="item.MedicationId"
+                                                   ValueChanged="@(value => HandleMedicationIdChanged(item, value))">
+                                            <MudSelectItem T="int" Value="0">Select medication</MudSelectItem>
 
-                @* Save and reload buttons were removed from this section.
-                   The fixed bottom bar in PatientDetails handles Save/Reload for the active section. *@
-            </EditForm>
-        </div>
-    </div>
+                                            @foreach (var medication in Medications)
+                                            {
+                                                <MudSelectItem T="int" Value="@medication.Id">
+                                                    @medication.Name
+                                                </MudSelectItem>
+                                            }
+                                        </MudSelect>
+
+                                        @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                Default frequency: @GetMedicationFrequency(item.MedicationId)
+                                            </MudText>
+                                        }
+                                    </MudItem>
+
+                                    <MudItem xs="7" md="3">
+                                        <MudNumericField T="decimal?"
+                                                         Label="Dose"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Disabled="@IsSaving"
+                                                         Value="item.Dose"
+                                                         ValueChanged="@(value => HandleMedicationDoseChanged(item, value))" />
+                                    </MudItem>
+
+                                    <MudItem xs="5" md="2">
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Error"
+                                                   FullWidth="true"
+                                                   StartIcon="@Icons.Material.Filled.Delete"
+                                                   Disabled="@IsSaving"
+                                                   OnClick="() => HandleRemoveNeurologyMedicationAsync(item)">
+                                            Remove
+                                        </MudButton>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
+                        }
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            No other medications added yet.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudPaper>
+
+            @* Save and reload buttons intentionally stay outside this section.
+               PatientDetailsActionBar handles Save/Reload for the active section. *@
+        </MudStack>
+    </EditForm>
 }
 
 @code {
@@ -303,11 +358,9 @@
     [Parameter, EditorRequired]
     public EditContext NeurologyEditContext { get; set; } = default!;
 
-
     // This flag disables buttons while the parent page is saving data.
     [Parameter]
     public bool IsSaving { get; set; }
-
 
     // The parent page provides the method that adds a medication row to the section.
     [Parameter, EditorRequired]
@@ -326,6 +379,76 @@
     [Parameter]
     public EventCallback<string> OnStatusMessage { get; set; }
 
+    // This helper is the key part of dirty tracking for MudBlazor fields.
+    // MudBlazor updates the value correctly, but we also manually notify the EditContext
+    // so PatientDetails.razor can enable the bottom Save button.
+    private void NotifyNeurologyFieldChanged(object model, string propertyName)
+    {
+        NeurologyEditContext.NotifyFieldChanged(new FieldIdentifier(model, propertyName));
+    }
+
+    // The next handlers update the GCS values and notify the parent EditContext.
+    // This keeps the calculated GCS chip updated and marks Neurology as dirty.
+    private void HandleGcsEyeChanged(GcsEyeResponse? value)
+    {
+        if (Patient?.Neurology is null)
+            return;
+
+        Patient.Neurology.GcsEye = value;
+        NotifyNeurologyFieldChanged(Patient.Neurology, nameof(Patient.Neurology.GcsEye));
+    }
+
+    private void HandleGcsVerbalChanged(GcsVerbalResponse? value)
+    {
+        if (Patient?.Neurology is null)
+            return;
+
+        Patient.Neurology.GcsVerbal = value;
+        NotifyNeurologyFieldChanged(Patient.Neurology, nameof(Patient.Neurology.GcsVerbal));
+    }
+
+    private void HandleGcsMotorChanged(GcsMotorResponse? value)
+    {
+        if (Patient?.Neurology is null)
+            return;
+
+        Patient.Neurology.GcsMotor = value;
+        NotifyNeurologyFieldChanged(Patient.Neurology, nameof(Patient.Neurology.GcsMotor));
+    }
+
+    // Free-text examination fields also need explicit notification.
+    private void HandlePupilsChanged(string? value)
+    {
+        if (Patient?.Neurology is null)
+            return;
+
+        Patient.Neurology.Pupils = value;
+        NotifyNeurologyFieldChanged(Patient.Neurology, nameof(Patient.Neurology.Pupils));
+    }
+
+    private void HandleMotorStatusChanged(string? value)
+    {
+        if (Patient?.Neurology is null)
+            return;
+
+        Patient.Neurology.MotorStatus = value;
+        NotifyNeurologyFieldChanged(Patient.Neurology, nameof(Patient.Neurology.MotorStatus));
+    }
+
+    // Medication row changes are patient-data changes, so they should mark Neurology dirty.
+    // The shared medication catalog manager is different: it changes the catalog only,
+    // so it intentionally does not call this helper.
+    private void HandleMedicationIdChanged(NeurologyMedication item, int value)
+    {
+        item.MedicationId = value;
+        NotifyNeurologyFieldChanged(item, nameof(item.MedicationId));
+    }
+
+    private void HandleMedicationDoseChanged(NeurologyMedication item, decimal? value)
+    {
+        item.Dose = value;
+        NotifyNeurologyFieldChanged(item, nameof(item.Dose));
+    }
 
     // This method asks the parent page to add a new neurology medication row.
     private async Task HandleAddNeurologyMedicationAsync(NeurologyMedicationCategory category)

@@ -1,195 +1,211 @@
 ﻿@using IcuNotes.Models
 @inject IcuNotes.Services.PatientService PatientService
 
-@* This component manages the shared medication catalog.
-   It can be reused by Neurology, Cardiology, GIT, and other sections later. *@
+@*
+    This component manages the shared medication catalog.
 
-@* The Add/Edit buttons are placed in a Bootstrap row with two equal columns.
-   d-grid makes each button fill its column, so the two buttons stay equal in width.
-   btn-sm keeps them compact and saves vertical space on mobile screens. *@
-<div class="row g-2 mb-2">
-    <div class="col-6 d-grid">
-        @* This button opens the modal that adds a new medication to the shared catalog. *@
-        <button type="button"
-                class="btn btn-outline-secondary btn-sm py-2"
-                @onclick="OpenAddMedicationModal"
-                disabled="@IsBusy">
-            Add Medication
-        </button>
-    </div>
+    It is reused inside clinical sections such as Neurology, Cardiology,
+    GastroIntestinal, and future sections.
 
-    <div class="col-6 d-grid">
-        @* This button opens the modal that edits an existing medication in the shared catalog. *@
-        <button type="button"
-                class="btn btn-outline-secondary btn-sm py-2"
-                @onclick="OpenEditMedicationModal"
-                disabled="@IsBusy">
-            Edit Medication
-        </button>
-    </div>
-</div>
+    Important design choice:
+    - This component does not use Bootstrap modals anymore.
+    - It uses inline MudBlazor panels instead.
+    - Inline panels are easier on mobile because the user stays inside the current section.
+    - No JavaScript is needed.
+*@
 
-@* This modal lets the user create a new shared medication catalog item. *@
-@if (showAddMedicationModal)
-{
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header py-2">
-                    <h6 class="modal-title mb-0">Add Medication</h6>
+<MudPaper Elevation="0" Class="pa-3 rounded-lg">
+    <MudStack Spacing="2">
 
-                    <button type="button"
-                            class="btn-close"
-                            @onclick="CloseAddMedicationModal"
-                            disabled="@IsBusy">
-                    </button>
-                </div>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.subtitle2">Medication catalog</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Shared medication names and default frequencies.
+                </MudText>
+            </MudStack>
 
-                <div class="modal-body p-2 p-sm-3">
-                    @* This warning shows validation or service errors inside the add modal. *@
+            <MudChip T="string"
+                     Size="Size.Small"
+                     Color="Color.Info"
+                     Variant="Variant.Outlined">
+                @Medications.Count
+            </MudChip>
+        </MudStack>
+
+        @* Main actions. MudGrid keeps the two buttons equal on mobile. *@
+        <MudGrid Spacing="2">
+            <MudItem xs="6">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           Disabled="@IsBusy"
+                           OnClick="OpenAddMedicationPanel">
+                    Add
+                </MudButton>
+            </MudItem>
+
+            <MudItem xs="6">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Edit"
+                           Disabled="@IsBusy"
+                           OnClick="OpenEditMedicationPanel">
+                    Edit
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (showAddMedicationPanel)
+        {
+            <MudPaper Elevation="1" Class="pa-3 rounded-lg">
+                <MudStack Spacing="2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.subtitle2">Add medication</MudText>
+
+                        <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                       Size="Size.Small"
+                                       Color="Color.Default"
+                                       Disabled="@IsBusy"
+                                       OnClick="CloseAddMedicationPanel"
+                                       AriaLabel="Close add medication panel" />
+                    </MudStack>
+
+                    @* This warning shows validation or service errors inside the add panel. *@
                     @if (!string.IsNullOrWhiteSpace(newMedicationErrorMessage))
                     {
-                        <div class="alert alert-warning py-2 mb-2">
+                        <MudAlert Severity="Severity.Warning" Dense="true">
                             @newMedicationErrorMessage
-                        </div>
+                        </MudAlert>
                     }
 
-                    @* Floating labels keep the label and input in one compact block. *@
-                    <div class="form-floating mb-2">
-                        <InputText id="@($"{componentId}-new-medication-name")"
-                                   class="form-control"
-                                   placeholder=" "
-                                   @bind-Value="newMedicationName" />
-                        <label for="@($"{componentId}-new-medication-name")">Medication Name</label>
-                    </div>
+                    <MudTextField @bind-Value="newMedicationName"
+                                  Label="Medication name"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Immediate="true"
+                                  Disabled="@IsBusy" />
 
-                    <div class="form-floating mb-1">
-                        <InputText id="@($"{componentId}-new-medication-frequency")"
-                                   class="form-control"
-                                   placeholder=" "
-                                   @bind-Value="newMedicationFrequency" />
-                        <label for="@($"{componentId}-new-medication-frequency")">Default Frequency</label>
-                    </div>
+                    <MudTextField @bind-Value="newMedicationFrequency"
+                                  Label="Default frequency"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Immediate="true"
+                                  Disabled="@IsBusy"
+                                  HelperText="Examples: mcg/kg/min, BD, TID, q8h" />
 
-                    <div class="form-text mb-2">
-                        Examples: mcg/kg/min, BD, TID, q8h
-                    </div>
-                </div>
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Default"
+                                   Disabled="@IsBusy"
+                                   OnClick="CloseAddMedicationPanel">
+                            Cancel
+                        </MudButton>
 
-                <div class="modal-footer py-2">
-                    <button type="button"
-                            class="btn btn-secondary btn-sm"
-                            @onclick="CloseAddMedicationModal"
-                            disabled="@IsBusy">
-                        Cancel
-                    </button>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Disabled="@IsBusy"
+                                   OnClick="SaveNewMedicationAsync">
+                            @if (isWorking)
+                            {
+                                <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="me-2" />
+                            }
+                            Save
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        }
 
-                    <button type="button"
-                            class="btn btn-primary btn-sm"
-                            @onclick="SaveNewMedicationAsync"
-                            disabled="@IsBusy">
-                        @(IsBusy ? "Saving..." : "Save Medication")
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
+        @if (showEditMedicationPanel)
+        {
+            <MudPaper Elevation="1" Class="pa-3 rounded-lg">
+                <MudStack Spacing="2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.subtitle2">Edit medication</MudText>
 
-@* This modal lets the user pick one existing medication and rename or update it. *@
-@if (showEditMedicationModal)
-{
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header py-2">
-                    <h6 class="modal-title mb-0">Edit Medication</h6>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                       Size="Size.Small"
+                                       Color="Color.Default"
+                                       Disabled="@IsBusy"
+                                       OnClick="CloseEditMedicationPanel"
+                                       AriaLabel="Close edit medication panel" />
+                    </MudStack>
 
-                    <button type="button"
-                            class="btn-close"
-                            @onclick="CloseEditMedicationModal"
-                            disabled="@IsBusy">
-                    </button>
-                </div>
-
-                <div class="modal-body p-2 p-sm-3">
-                    @* This warning shows validation or service errors inside the edit modal. *@
+                    @* This warning shows validation or service errors inside the edit panel. *@
                     @if (!string.IsNullOrWhiteSpace(editMedicationErrorMessage))
                     {
-                        <div class="alert alert-warning py-2 mb-2">
+                        <MudAlert Severity="Severity.Warning" Dense="true">
                             @editMedicationErrorMessage
-                        </div>
+                        </MudAlert>
                     }
 
                     @if (!Medications.Any())
                     {
-                        <div class="alert alert-light border py-2 mb-0">
-                            No medications in the catalog yet.
-                        </div>
+                        <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined">
+                            No medications in the catalog yet. Add one first.
+                        </MudAlert>
                     }
                     else
                     {
-                        @* The select also uses a floating label to keep the edit modal compact. *@
-                        <div class="form-floating mb-2">
-                            <select id="@($"{componentId}-selected-medication")"
-                                    class="form-select"
-                                    value="@selectedMedicationToEditId"
-                                    @onchange="OnSelectedMedicationToEditChanged">
-                                @foreach (var medication in Medications)
+                        <MudSelect T="int"
+                                   @bind-Value="SelectedMedicationToEditId"
+                                   Label="Select medication"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   Disabled="@IsBusy">
+                            @foreach (var medication in Medications)
+                            {
+                                <MudSelectItem T="int" Value="@medication.Id">
+                                    @medication.Name
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudTextField @bind-Value="editMedicationName"
+                                      Label="Medication name"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Immediate="true"
+                                      Disabled="@IsBusy" />
+
+                        <MudTextField @bind-Value="editMedicationFrequency"
+                                      Label="Default frequency"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Immediate="true"
+                                      Disabled="@IsBusy"
+                                      HelperText="Examples: mcg/kg/min, BD, TID, q8h" />
+
+                        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Default"
+                                       Disabled="@IsBusy"
+                                       OnClick="CloseEditMedicationPanel">
+                                Cancel
+                            </MudButton>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Disabled="@IsBusy"
+                                       OnClick="SaveEditedMedicationAsync">
+                                @if (isWorking)
                                 {
-                                    <option value="@medication.Id">@medication.Name</option>
+                                    <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="me-2" />
                                 }
-                            </select>
-                            <label for="@($"{componentId}-selected-medication")">Select Medication</label>
-                        </div>
-
-                        <div class="form-floating mb-2">
-                            <InputText id="@($"{componentId}-edit-medication-name")"
-                                       class="form-control"
-                                       placeholder=" "
-                                       @bind-Value="editMedicationName" />
-                            <label for="@($"{componentId}-edit-medication-name")">Medication Name</label>
-                        </div>
-
-                        <div class="form-floating mb-1">
-                            <InputText id="@($"{componentId}-edit-medication-frequency")"
-                                       class="form-control"
-                                       placeholder=" "
-                                       @bind-Value="editMedicationFrequency" />
-                            <label for="@($"{componentId}-edit-medication-frequency")">Default Frequency</label>
-                        </div>
-
-                        <div class="form-text mb-2">
-                            Examples: mcg/kg/min, BD, TID, q8h
-                        </div>
+                                Save
+                            </MudButton>
+                        </MudStack>
                     }
-                </div>
-
-                <div class="modal-footer py-2">
-                    <button type="button"
-                            class="btn btn-secondary btn-sm"
-                            @onclick="CloseEditMedicationModal"
-                            disabled="@IsBusy">
-                        Cancel
-                    </button>
-
-                    <button type="button"
-                            class="btn btn-primary btn-sm"
-                            @onclick="SaveEditedMedicationAsync"
-                            disabled="@IsBusy">
-                        @(IsBusy ? "Saving..." : "Save Changes")
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
+                </MudStack>
+            </MudPaper>
+        }
+    </MudStack>
+</MudPaper>
 
 @code {
-    // This unique id prefix prevents duplicate HTML id values when this manager
-    // is used more than once on the same page, such as Sedation and Neuro Medications.
-    private readonly string componentId = $"medications-manager-{Guid.NewGuid():N}";
-
     // The parent passes the current shared medication list into this component.
     [Parameter, EditorRequired]
     public List<Medication> Medications { get; set; } = new();
@@ -206,48 +222,62 @@
     [Parameter]
     public EventCallback<string> OnStatusMessage { get; set; }
 
-    // These fields store the Add Medication modal state.
-    private bool showAddMedicationModal;
+    // These fields store the Add Medication panel state.
+    private bool showAddMedicationPanel;
     private string newMedicationName = string.Empty;
     private string newMedicationFrequency = string.Empty;
     private string? newMedicationErrorMessage;
 
-    // These fields store the Edit Medication modal state.
-    private bool showEditMedicationModal;
+    // These fields store the Edit Medication panel state.
+    private bool showEditMedicationPanel;
     private int selectedMedicationToEditId;
     private string editMedicationName = string.Empty;
     private string editMedicationFrequency = string.Empty;
     private string? editMedicationErrorMessage;
 
+    // This property lets MudSelect use normal @bind-Value syntax.
+    // When the selected medication changes, the edit fields are loaded automatically.
+    private int SelectedMedicationToEditId
+    {
+        get => selectedMedicationToEditId;
+        set
+        {
+            if (selectedMedicationToEditId == value)
+                return;
+
+            LoadMedicationForEdit(value);
+        }
+    }
+
     // This local flag prevents double-click saves inside the manager itself.
     private bool isWorking;
 
-    // This combined flag is used by buttons and modal actions.
+    // This combined flag is used by buttons and panel actions.
     private bool IsBusy => IsDisabled || isWorking;
 
-    // This method opens the Add Medication modal and resets old errors and values.
-    private void OpenAddMedicationModal()
+    // This method opens the Add Medication panel and resets old errors and values.
+    private void OpenAddMedicationPanel()
     {
-        showEditMedicationModal = false;
+        showEditMedicationPanel = false;
         newMedicationName = string.Empty;
         newMedicationFrequency = string.Empty;
         newMedicationErrorMessage = null;
-        showAddMedicationModal = true;
+        showAddMedicationPanel = true;
     }
 
-    // This method closes the Add Medication modal and clears its old error message.
-    private void CloseAddMedicationModal()
+    // This method closes the Add Medication panel and clears its old error message.
+    private void CloseAddMedicationPanel()
     {
-        showAddMedicationModal = false;
+        showAddMedicationPanel = false;
         newMedicationErrorMessage = null;
     }
 
-    // This method opens the Edit Medication modal and preloads one medication for editing.
-    private void OpenEditMedicationModal()
+    // This method opens the Edit Medication panel and preloads one medication for editing.
+    private void OpenEditMedicationPanel()
     {
-        showAddMedicationModal = false;
+        showAddMedicationPanel = false;
         editMedicationErrorMessage = null;
-        showEditMedicationModal = true;
+        showEditMedicationPanel = true;
 
         if (Medications.Any())
         {
@@ -261,26 +291,14 @@
         }
     }
 
-    // This method closes the Edit Medication modal and clears its working values.
-    private void CloseEditMedicationModal()
+    // This method closes the Edit Medication panel and clears its working values.
+    private void CloseEditMedicationPanel()
     {
-        showEditMedicationModal = false;
+        showEditMedicationPanel = false;
         selectedMedicationToEditId = 0;
         editMedicationName = string.Empty;
         editMedicationFrequency = string.Empty;
         editMedicationErrorMessage = null;
-    }
-
-    // This method loads a medication into the edit form when the selection changes.
-    private void OnSelectedMedicationToEditChanged(ChangeEventArgs e)
-    {
-        if (e.Value is null)
-            return;
-
-        if (int.TryParse(e.Value.ToString(), out var medicationId))
-        {
-            LoadMedicationForEdit(medicationId);
-        }
     }
 
     // This helper copies the selected medication values into the edit fields.
@@ -325,7 +343,7 @@
             var refreshedMedications = await PatientService.GetMedicationsAsync();
             await OnMedicationsChanged.InvokeAsync(refreshedMedications);
 
-            showAddMedicationModal = false;
+            showAddMedicationPanel = false;
             newMedicationName = string.Empty;
             newMedicationFrequency = string.Empty;
             newMedicationErrorMessage = null;
@@ -379,7 +397,7 @@
             await OnMedicationsChanged.InvokeAsync(refreshedMedications);
 
             LoadMedicationForEdit(selectedMedicationToEditId);
-            showEditMedicationModal = false;
+            showEditMedicationPanel = false;
             editMedicationErrorMessage = null;
 
             if (OnStatusMessage.HasDelegate)

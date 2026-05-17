@@ -4,127 +4,260 @@
 
 <PageTitle>Archived Patients</PageTitle>
 
-<h3>Archived Patients</h3>
+<MudContainer MaxWidth="MaxWidth.Medium" Class="pa-3">
 
-<div class="mb-3">
-    <!--
-        Simple live search by patient name.
-        The list updates as the user types.
-    -->
-    <input class="form-control"
-           placeholder="Search by name..."
-           @bind="searchText"
-           @bind:event="oninput" />
-</div>
+    <MudStack Spacing="3">
 
-@if (!string.IsNullOrWhiteSpace(statusMessage))
-{
-    <div class="alert @statusCssClass">
-        @statusMessage
-    </div>
-}
+        <!--
+            Page header.
 
-@if (archivedPatients is null)
-{
-    <p>Loading...</p>
-}
-else if (!FilteredArchivedPatients.Any())
-{
-    if (string.IsNullOrWhiteSpace(searchText))
-    {
-        <p>No archived patients found.</p>
-    }
-    else
-    {
-        <p>No archived patients match your search.</p>
-    }
-}
-else
-{
-    <p class="text-muted">
-        Showing @FilteredArchivedPatients.Count() of @archivedPatients.Count archived patients
-    </p>
+            This page is now designed as a mobile-first archive screen.
+            Archived patients are shown as cards instead of a table because
+            cards are easier to read and tap on a phone.
+        -->
+        <MudPaper Elevation="0" Outlined="true" Class="pa-4 rounded-lg">
+            <MudStack Spacing="2">
+                <MudStack Row="true"
+                          AlignItems="AlignItems.Center"
+                          Justify="Justify.SpaceBetween">
+                    <div>
+                        <MudText Typo="Typo.h5">
+                            Archived Patients
+                        </MudText>
 
-    <table class="table table-striped table-bordered align-middle">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Age</th>
-                <th>Weight</th>
-                <th>Diagnosis</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
+                        <MudText Typo="Typo.body2"
+                                 Color="Color.Secondary">
+                            Restore previous patients or permanently delete archived records.
+                        </MudText>
+                    </div>
+
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2"
+                             Color="Color.Secondary"
+                             Size="Size.Large" />
+                </MudStack>
+
+                <!--
+                    Immediate=true makes the search update while typing,
+                    similar to the previous @bind:event="oninput" behavior.
+                -->
+                <MudTextField T="string"
+                              @bind-Value="searchText"
+                              Label="Search by name"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Immediate="true"
+                              Clearable="true"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" />
+
+                @if (archivedPatients is not null)
+                {
+                    <MudText Typo="Typo.caption"
+                             Color="Color.Secondary">
+                        Showing @FilteredArchivedPatients.Count() of @archivedPatients.Count archived patients
+                    </MudText>
+                }
+            </MudStack>
+        </MudPaper>
+
+        @if (!string.IsNullOrWhiteSpace(statusMessage))
+        {
+            <!--
+                MudAlert replaces the old Bootstrap alert classes.
+                The color is controlled by the Severity enum in code.
+            -->
+            <MudAlert Severity="statusSeverity"
+                      Variant="Variant.Filled"
+                      Dense="true">
+                @statusMessage
+            </MudAlert>
+        }
+
+        @if (archivedPatients is null)
+        {
+            <!--
+                Loading state shown while the database query is running.
+            -->
+            <MudPaper Elevation="0" Outlined="true" Class="pa-5 rounded-lg">
+                <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Typo="Typo.body2"
+                             Color="Color.Secondary">
+                        Loading archived patients...
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        }
+        else if (!FilteredArchivedPatients.Any())
+        {
+            <!--
+                Empty state.
+
+                We show a friendlier message instead of a plain paragraph.
+            -->
+            <MudPaper Elevation="0" Outlined="true" Class="pa-5 rounded-lg">
+                <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff"
+                             Size="Size.Large"
+                             Color="Color.Secondary" />
+
+                    <MudText Typo="Typo.subtitle1"
+                             Align="Align.Center">
+                        @EmptyStateTitle
+                    </MudText>
+
+                    <MudText Typo="Typo.body2"
+                             Color="Color.Secondary"
+                             Align="Align.Center">
+                        @EmptyStateMessage
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        }
+        else
+        {
+            <!--
+                Mobile-first archived patient list.
+
+                Each patient is a card with:
+                - name
+                - age / weight chips
+                - diagnosis
+                - restore and delete actions
+
+                This avoids the horizontal crowding of a table on phones.
+            -->
             @foreach (var patient in FilteredArchivedPatients)
             {
-                <tr>
-                    <td>@patient.Name</td>
-                    <td>@patient.Age</td>
-                    <td>@patient.Weight</td>
-                    <td>@patient.Diagnosis</td>                    
-                    <td>
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 rounded-lg">
+                    <MudStack Spacing="2">
+
+                        <MudStack Row="true"
+                                  AlignItems="AlignItems.Start"
+                                  Justify="Justify.SpaceBetween">
+                            <div>
+                                <MudText Typo="Typo.subtitle1">
+                                    @patient.Name
+                                </MudText>
+
+                                <MudText Typo="Typo.caption"
+                                         Color="Color.Secondary">
+                                    Archived patient record
+                                </MudText>
+                            </div>
+
+                            <MudIcon Icon="@Icons.Material.Filled.Archive"
+                                     Color="Color.Secondary" />
+                        </MudStack>
+
+                        <MudStack Row="true" Spacing="1">
+                            <MudChip T="string"
+                                     Variant="Variant.Outlined"
+                                     Color="Color.Info"
+                                     Size="Size.Small">
+                                Age: @patient.Age
+                            </MudChip>
+
+                            <MudChip T="string"
+                                     Variant="Variant.Outlined"
+                                     Color="Color.Info"
+                                     Size="Size.Small">
+                                Weight: @patient.Weight kg
+                            </MudChip>
+                        </MudStack>
+
+                        <MudDivider />
+
+                        <div>
+                            <MudText Typo="Typo.caption"
+                                     Color="Color.Secondary">
+                                Diagnosis
+                            </MudText>
+
+                            <MudText Typo="Typo.body2">
+                                @GetDiagnosisText(patient)
+                            </MudText>
+                        </div>
+
                         @if (pendingDeleteId == patient.Id)
                         {
-                            <div class="d-flex flex-column gap-2">
-                                <div class="text-danger small">
-                                    Delete @patient.Name permanently?
-                                </div>
+                            <!--
+                                Inline delete confirmation.
 
-                                <div>
-                                    <button class="btn btn-danger btn-sm me-2"
-                                            @onclick="() => DeleteArchivedPatientAsync(patient.Id)">
-                                        Yes, Delete
-                                    </button>
+                                Only one patient card enters confirmation mode at a time.
+                                This keeps the dangerous action close to the selected record.
+                            -->
+                            <MudAlert Severity="Severity.Warning"
+                                      Variant="Variant.Outlined"
+                                      Dense="true">
+                                Permanently delete @patient.Name?
+                            </MudAlert>
 
-                                    <button class="btn btn-secondary btn-sm"
-                                            @onclick="CancelDelete">
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
+                            <MudStack Row="true" Spacing="2">
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Error"
+                                           StartIcon="@Icons.Material.Filled.DeleteForever"
+                                           OnClick="() => DeleteArchivedPatientAsync(patient.Id)">
+                                    Delete
+                                </MudButton>
+
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Default"
+                                           OnClick="CancelDelete">
+                                    Cancel
+                                </MudButton>
+                            </MudStack>
                         }
                         else
                         {
-                            <button class="btn btn-success btn-sm me-2"
-                                    @onclick="() => RestorePatientAsync(patient.Id)">
-                                Restore
-                            </button>
+                            <MudStack Row="true" Spacing="2">
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Success"
+                                           StartIcon="@Icons.Material.Filled.Restore"
+                                           OnClick="() => RestorePatientAsync(patient.Id)">
+                                    Restore
+                                </MudButton>
 
-                            <button class="btn btn-danger btn-sm"
-                                    @onclick="() => AskToDelete(patient.Id)">
-                                Delete
-                            </button>
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Error"
+                                           StartIcon="@Icons.Material.Filled.Delete"
+                                           OnClick="() => AskToDelete(patient.Id)">
+                                    Delete
+                                </MudButton>
+                            </MudStack>
                         }
-                    </td>
-                </tr>
+
+                    </MudStack>
+                </MudPaper>
             }
-        </tbody>
-    </table>
-}
+        }
+
+    </MudStack>
+
+</MudContainer>
 
 @code {
-    // Status message text shown above the table
+    // Status message text shown above the archived patient list.
     private string? statusMessage;
 
-    // Bootstrap class used for the status message style
-    private string statusCssClass = "alert-info";
+    // MudBlazor alert severity replaces the old Bootstrap CSS alert classes.
+    private Severity statusSeverity = Severity.Info;
 
-    // Helper method to set a message and its color/style
-    private void SetStatus(string message, string cssClass = "alert-info")
+    // Helper method to set a message and its MudBlazor alert color.
+    private void SetStatus(string message, Severity severity = Severity.Info)
     {
         statusMessage = message;
-        statusCssClass = cssClass;
+        statusSeverity = severity;
     }
 
-    // All archived patients loaded from the database
+    // All archived patients loaded from the database.
     private List<ArchivedPatient>? archivedPatients;
 
-    // Current text typed in the search box
+    // Current text typed in the search box.
     private string searchText = string.Empty;
 
     // Stores the archived patient Id currently waiting for delete confirmation.
-    // If null, no row is currently in delete-confirm mode.
+    // If null, no patient card is currently in delete-confirm mode.
     private int? pendingDeleteId;
 
     // Returns either all archived patients or only the ones
@@ -137,50 +270,70 @@ else
                     !string.IsNullOrWhiteSpace(p.Name) &&
                     p.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase));
 
+    // Friendly empty-state title shown when the archive list has no visible records.
+    private string EmptyStateTitle =>
+        string.IsNullOrWhiteSpace(searchText)
+            ? "No archived patients found"
+            : "No matching archived patients";
+
+    // Friendly empty-state details shown below the empty-state title.
+    private string EmptyStateMessage =>
+        string.IsNullOrWhiteSpace(searchText)
+            ? "Archived patients will appear here after you archive them from the active patients list."
+            : "Try a different name or clear the search box.";
+
     protected override async Task OnInitializedAsync()
     {
         await LoadArchivedPatientsAsync();
     }
 
-    // Load all archived patients from the database
+    // Load all archived patients from the database.
     private async Task LoadArchivedPatientsAsync()
     {
         archivedPatients = await PatientService.GetArchivedAsync();
     }
 
-    // Restore one archived patient back to the active patients list
+    // Restore one archived patient back to the active patients list.
     private async Task RestorePatientAsync(int archivedPatientId)
     {
-        // If a delete confirmation is showing, cancel it first
+        // If a delete confirmation is showing, cancel it first.
         pendingDeleteId = null;
 
         await PatientService.RestorePatientAsync(archivedPatientId);
         await LoadArchivedPatientsAsync();
 
-        SetStatus("Patient restored successfully.", "alert-success");
+        SetStatus("Patient restored successfully.", Severity.Success);
     }
 
-    // First click on Delete puts only that row into confirmation mode
+    // First click on Delete puts only that patient card into confirmation mode.
     private void AskToDelete(int archivedPatientId)
     {
         pendingDeleteId = archivedPatientId;
-        SetStatus("Please confirm permanent deletion.", "alert-warning");
+        SetStatus("Please confirm permanent deletion.", Severity.Warning);
     }
 
-    // Cancel delete confirmation mode
+    // Cancel delete confirmation mode.
     private void CancelDelete()
     {
         pendingDeleteId = null;
-        SetStatus("Deletion cancelled.", "alert-info");
+        SetStatus("Deletion cancelled.", Severity.Info);
     }
 
-    // Permanently delete the archived patient after confirmation
+    // Permanently delete the archived patient after confirmation.
     private async Task DeleteArchivedPatientAsync(int archivedPatientId)
     {
         await PatientService.DeleteArchivedAsync(archivedPatientId);
         pendingDeleteId = null;
         await LoadArchivedPatientsAsync();
 
-        SetStatus("Archived patient deleted permanently.", "alert-success");
+        SetStatus("Archived patient deleted permanently.", Severity.Success);
+    }
+
+    // Keeps the markup cleaner and avoids showing a blank diagnosis area.
+    private static string GetDiagnosisText(ArchivedPatient patient)
+    {
+        return string.IsNullOrWhiteSpace(patient.Diagnosis)
+            ? "No diagnosis recorded."
+            : patient.Diagnosis;
     }
 }

@@ -13,254 +13,256 @@
     - The current patient's selected admission unit is Overview data,
       so that must stay inside OverviewSection.razor.
 
-    UI update in this version:
-    - Uses Bootstrap as much as possible.
-    - Add/Edit buttons are compact and equal width.
-    - Modals use Bootstrap modal classes.
-    - The dark backdrop uses Bootstrap modal-backdrop.
-    - No custom CSS.
-    - No JavaScript.
+    MudBlazor migration notes:
+    - Bootstrap buttons and modals were replaced with MudBlazor components.
+    - Instead of opening modal windows, this version uses an inline expandable panel.
+    - This is simpler and safer on mobile because the user stays inside the Overview page.
+    - No JavaScript is used.
 *@
 
-@*
-    Compact catalog action buttons.
+<MudStack Spacing="2">
 
-    Bootstrap grid gives both buttons equal width.
-    btn-sm makes them less dominant in the Overview section.
-*@
-<div class="row g-2">
-    <div class="col-6">
-        <button type="button"
-                class="btn btn-outline-secondary btn-sm w-100"
-                @onclick="OpenAddAdmissionUnitModal"
-                disabled="@IsBusy">
-            Add Unit
-        </button>
-    </div>
+    @*
+        Two compact actions.
 
-    <div class="col-6">
-        <button type="button"
-                class="btn btn-outline-secondary btn-sm w-100"
-                @onclick="OpenEditAdmissionUnitModal"
-                disabled="@IsBusy">
-            Edit Unit
-        </button>
-    </div>
-</div>
+        MudGrid keeps the buttons equal width on mobile.
+        This replaces the old Bootstrap row/col button layout.
+    *@
+    <MudGrid Spacing="2">
+        <MudItem xs="6">
+            <MudButton FullWidth="true"
+                       Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Disabled="@IsBusy"
+                       OnClick="OpenAddAdmissionUnitModal">
+                Add Unit
+            </MudButton>
+        </MudItem>
 
-@* This modal lets the user create a new reusable Admission Unit in the shared catalog. *@
-@if (showAddAdmissionUnitModal)
-{
-    <div class="modal fade show d-block"
-         tabindex="-1"
-         role="dialog"
-         aria-modal="true">
+        <MudItem xs="6">
+            <MudButton FullWidth="true"
+                       Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       Disabled="@IsBusy"
+                       OnClick="OpenEditAdmissionUnitModal">
+                Edit Unit
+            </MudButton>
+        </MudItem>
+    </MudGrid>
 
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
+    @*
+        Add Admission Unit panel.
 
-                <div class="modal-header py-2">
-                    <h5 class="modal-title fs-6">
-                        Add Admission Unit
-                    </h5>
+        This replaces the old Bootstrap modal.
+        The panel appears inline under the buttons, which is more predictable
+        inside a mobile-first patient details page.
+    *@
+    @if (showAddAdmissionUnitModal)
+    {
+        <MudPaper Elevation="0"
+                  Outlined="true"
+                  Class="pa-3 rounded-lg">
 
-                    <button type="button"
-                            class="btn-close"
-                            aria-label="Close"
-                            @onclick="CloseAddAdmissionUnitModal"
-                            disabled="@IsBusy">
-                    </button>
-                </div>
+            <MudStack Spacing="2">
+                <MudStack Row="true"
+                          AlignItems="AlignItems.Center"
+                          Justify="Justify.SpaceBetween"
+                          Spacing="2">
 
-                <div class="modal-body">
-                    @if (!string.IsNullOrWhiteSpace(newAdmissionUnitErrorMessage))
-                    {
-                        <div class="alert alert-warning py-2">
-                            @newAdmissionUnitErrorMessage
-                        </div>
-                    }
+                    <MudText Typo="Typo.subtitle2">
+                        Add admission unit
+                    </MudText>
+
+                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                   Color="Color.Default"
+                                   Size="Size.Small"
+                                   Disabled="@IsBusy"
+                                   OnClick="CloseAddAdmissionUnitModal"
+                                   AriaLabel="Close add admission unit panel" />
+                </MudStack>
+
+                @if (!string.IsNullOrWhiteSpace(newAdmissionUnitErrorMessage))
+                {
+                    <MudAlert Severity="Severity.Warning"
+                              Dense="true"
+                              Variant="Variant.Outlined">
+                        @newAdmissionUnitErrorMessage
+                    </MudAlert>
+                }
+
+                @*
+                    MudTextField is used instead of InputText.
+
+                    Why?
+                    This component is a catalog manager, not part of the patient
+                    Overview EditForm. Keeping this as an independent MudBlazor
+                    field avoids accidental interaction with the parent EditContext.
+                *@
+                <MudTextField T="string"
+                              Label="Admission unit name"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Immediate="true"
+                              Disabled="@IsBusy"
+                              @bind-Value="newAdmissionUnitName" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudButton FullWidth="true"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Default"
+                                   Disabled="@IsBusy"
+                                   OnClick="CloseAddAdmissionUnitModal">
+                            Cancel
+                        </MudButton>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudButton FullWidth="true"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Disabled="@IsBusy"
+                                   OnClick="SaveNewAdmissionUnitAsync">
+                            @if (IsBusy)
+                            {
+                                <MudProgressCircular Indeterminate="true"
+                                                     Size="Size.Small"
+                                                     Class="me-2" />
+                                <span>Saving</span>
+                            }
+                            else
+                            {
+                                <span>Save</span>
+                            }
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudStack>
+        </MudPaper>
+    }
+
+    @*
+        Edit Admission Unit panel.
+
+        This also replaces the old Bootstrap modal.
+        It stays inline so the user can quickly edit the catalog without
+        visually leaving the Overview section.
+    *@
+    @if (showEditAdmissionUnitModal)
+    {
+        <MudPaper Elevation="0"
+                  Outlined="true"
+                  Class="pa-3 rounded-lg">
+
+            <MudStack Spacing="2">
+                <MudStack Row="true"
+                          AlignItems="AlignItems.Center"
+                          Justify="Justify.SpaceBetween"
+                          Spacing="2">
+
+                    <MudText Typo="Typo.subtitle2">
+                        Edit admission unit
+                    </MudText>
+
+                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                   Color="Color.Default"
+                                   Size="Size.Small"
+                                   Disabled="@IsBusy"
+                                   OnClick="CloseEditAdmissionUnitModal"
+                                   AriaLabel="Close edit admission unit panel" />
+                </MudStack>
+
+                @if (!string.IsNullOrWhiteSpace(editAdmissionUnitErrorMessage))
+                {
+                    <MudAlert Severity="Severity.Warning"
+                              Dense="true"
+                              Variant="Variant.Outlined">
+                        @editAdmissionUnitErrorMessage
+                    </MudAlert>
+                }
+
+                @if (!AdmissionUnits.Any())
+                {
+                    <MudAlert Severity="Severity.Info"
+                              Dense="true"
+                              Variant="Variant.Outlined">
+                        No admission units in the catalog yet.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudSelect T="int"
+                               Label="Select unit"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Disabled="@IsBusy"
+                               Value="@selectedAdmissionUnitToEditId"
+                               ValueChanged="OnSelectedAdmissionUnitToEditChanged">
+
+                        @foreach (var unit in AdmissionUnits)
+                        {
+                            <MudSelectItem T="int" Value="@unit.Id">
+                                @unit.Name
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
 
                     @*
-                        Normal HTML input is used here instead of InputText.
-
-                        Why?
-                        This component is a catalog manager, not part of the patient
-                        Overview EditForm. A normal input avoids accidental interaction
-                        with any parent EditContext.
+                        MudTextField is used instead of InputText for the same
+                        reason as the Add panel: this is catalog state, not
+                        patient Overview form state.
                     *@
-                    <div class="form-floating">
-                        <input type="text"
-                               class="form-control"
-                               id="newAdmissionUnitName"
-                               placeholder=" "
-                               @bind="newAdmissionUnitName"
-                               @bind:event="oninput"
-                               disabled="@IsBusy" />
+                    <MudTextField T="string"
+                                  Label="Unit name"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Immediate="true"
+                                  Disabled="@IsBusy"
+                                  @bind-Value="editAdmissionUnitName" />
+                }
 
-                        <label for="newAdmissionUnitName">
-                            Admission Unit Name
-                        </label>
-                    </div>
-                </div>
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudButton FullWidth="true"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Default"
+                                   Disabled="@IsBusy"
+                                   OnClick="CloseEditAdmissionUnitModal">
+                            Cancel
+                        </MudButton>
+                    </MudItem>
 
-                <div class="modal-footer">
-                    <div class="row g-2 w-100">
-                        <div class="col-6">
-                            <button type="button"
-                                    class="btn btn-secondary w-100"
-                                    @onclick="CloseAddAdmissionUnitModal"
-                                    disabled="@IsBusy">
-                                Cancel
-                            </button>
-                        </div>
+                    <MudItem xs="6">
+                        <MudButton FullWidth="true"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Disabled="@(IsBusy || !AdmissionUnits.Any())"
+                                   OnClick="SaveEditedAdmissionUnitAsync">
+                            @if (IsBusy)
+                            {
+                                <MudProgressCircular Indeterminate="true"
+                                                     Size="Size.Small"
+                                                     Class="me-2" />
+                                <span>Saving</span>
+                            }
+                            else
+                            {
+                                <span>Save</span>
+                            }
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudStack>
+        </MudPaper>
+    }
 
-                        <div class="col-6">
-                            <button type="button"
-                                    class="btn btn-primary w-100"
-                                    @onclick="SaveNewAdmissionUnitAsync"
-                                    disabled="@IsBusy">
-                                @(IsBusy ? "Saving..." : "Save")
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </div>
-
-    @*
-        Bootstrap modal backdrop.
-
-        Clicking the backdrop closes the modal.
-        This is still Blazor-controlled and does not use Bootstrap JavaScript.
-    *@
-    <div class="modal-backdrop fade show"
-         @onclick="CloseAddAdmissionUnitModal">
-    </div>
-}
-
-@* This modal lets the user edit an existing reusable Admission Unit from the shared catalog. *@
-@if (showEditAdmissionUnitModal)
-{
-    <div class="modal fade show d-block"
-         tabindex="-1"
-         role="dialog"
-         aria-modal="true">
-
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-
-                <div class="modal-header py-2">
-                    <h5 class="modal-title fs-6">
-                        Edit Admission Unit
-                    </h5>
-
-                    <button type="button"
-                            class="btn-close"
-                            aria-label="Close"
-                            @onclick="CloseEditAdmissionUnitModal"
-                            disabled="@IsBusy">
-                    </button>
-                </div>
-
-                <div class="modal-body">
-                    @if (!string.IsNullOrWhiteSpace(editAdmissionUnitErrorMessage))
-                    {
-                        <div class="alert alert-warning py-2">
-                            @editAdmissionUnitErrorMessage
-                        </div>
-                    }
-
-                    @if (!AdmissionUnits.Any())
-                    {
-                        <div class="alert alert-light border mb-0">
-                            No admission units in the catalog yet.
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="vstack gap-3">
-
-                            <div class="form-floating">
-                                <select class="form-select"
-                                        id="selectedAdmissionUnitToEdit"
-                                        value="@selectedAdmissionUnitToEditId"
-                                        @onchange="OnSelectedAdmissionUnitToEditChanged"
-                                        disabled="@IsBusy">
-                                    @foreach (var unit in AdmissionUnits)
-                                    {
-                                        <option value="@unit.Id">@unit.Name</option>
-                                    }
-                                </select>
-
-                                <label for="selectedAdmissionUnitToEdit">
-                                    Select Unit
-                                </label>
-                            </div>
-
-                            @*
-                                Normal HTML input is used here instead of InputText
-                                for the same reason as the Add modal.
-                            *@
-                            <div class="form-floating">
-                                <input type="text"
-                                       class="form-control"
-                                       id="editAdmissionUnitName"
-                                       placeholder=" "
-                                       @bind="editAdmissionUnitName"
-                                       @bind:event="oninput"
-                                       disabled="@IsBusy" />
-
-                                <label for="editAdmissionUnitName">
-                                    Unit Name
-                                </label>
-                            </div>
-
-                        </div>
-                    }
-                </div>
-
-                <div class="modal-footer">
-                    <div class="row g-2 w-100">
-                        <div class="col-6">
-                            <button type="button"
-                                    class="btn btn-secondary w-100"
-                                    @onclick="CloseEditAdmissionUnitModal"
-                                    disabled="@IsBusy">
-                                Cancel
-                            </button>
-                        </div>
-
-                        <div class="col-6">
-                            <button type="button"
-                                    class="btn btn-primary w-100"
-                                    @onclick="SaveEditedAdmissionUnitAsync"
-                                    disabled="@(IsBusy || !AdmissionUnits.Any())">
-                                @(IsBusy ? "Saving..." : "Save")
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </div>
-
-    @*
-        Bootstrap modal backdrop.
-
-        Clicking the backdrop closes the modal.
-        This is still Blazor-controlled and does not use Bootstrap JavaScript.
-    *@
-    <div class="modal-backdrop fade show"
-         @onclick="CloseEditAdmissionUnitModal">
-    </div>
-}
+</MudStack>
 
 @code {
     // This shared catalog fills the Admission Unit dropdown in Overview
-    // and the Edit Admission Unit modal here.
+    // and the Edit Admission Unit panel here.
     [Parameter, EditorRequired]
     public List<AdmissionUnitCatalog> AdmissionUnits { get; set; } = new();
 
@@ -294,24 +296,24 @@
     [Parameter]
     public EventCallback OnSaveAdmissionUnitSelection { get; set; }
 
-    // This local state controls the Add Admission Unit modal.
+    // This local state controls the Add Admission Unit panel.
     private bool showAddAdmissionUnitModal;
     private string newAdmissionUnitName = string.Empty;
     private string? newAdmissionUnitErrorMessage;
 
-    // This local state controls the Edit Admission Unit modal.
+    // This local state controls the Edit Admission Unit panel.
     private bool showEditAdmissionUnitModal;
     private int selectedAdmissionUnitToEditId;
     private string editAdmissionUnitName = string.Empty;
     private string? editAdmissionUnitErrorMessage;
 
-    // This local flag prevents double-clicking the modal save buttons.
+    // This local flag prevents double-clicking the panel save buttons.
     private bool isWorking;
 
-    // This combined flag is used by buttons and modal actions.
+    // This combined flag is used by buttons and panel actions.
     private bool IsBusy => IsDisabled || IsSaving || isWorking;
 
-    // This method opens the Add modal in a clean empty state.
+    // This method opens the Add panel in a clean empty state.
     private void OpenAddAdmissionUnitModal()
     {
         showEditAdmissionUnitModal = false;
@@ -322,7 +324,7 @@
         showAddAdmissionUnitModal = true;
     }
 
-    // This method closes the Add modal and clears old validation messages.
+    // This method closes the Add panel and clears old validation messages.
     private void CloseAddAdmissionUnitModal()
     {
         if (IsBusy)
@@ -332,7 +334,7 @@
         newAdmissionUnitErrorMessage = null;
     }
 
-    // This method opens the Edit modal and preloads the first available unit.
+    // This method opens the Edit panel and preloads the first available unit.
     // Notice that it no longer uses Patient.AdmissionUnitCatalogId.
     // The selected patient admission unit belongs to Overview, not to this manager.
     private void OpenEditAdmissionUnitModal()
@@ -357,7 +359,7 @@
         }
     }
 
-    // This method closes the Edit modal and clears temporary selection state.
+    // This method closes the Edit panel and clears temporary selection state.
     private void CloseEditAdmissionUnitModal()
     {
         if (IsBusy)
@@ -369,16 +371,13 @@
         editAdmissionUnitErrorMessage = null;
     }
 
-    // This method reacts when the user chooses another catalog row in the edit dropdown.
-    private void OnSelectedAdmissionUnitToEditChanged(ChangeEventArgs e)
+    // This method reacts when the user chooses another catalog row in the MudSelect.
+    private void OnSelectedAdmissionUnitToEditChanged(int admissionUnitId)
     {
-        if (e.Value is null)
+        if (admissionUnitId <= 0)
             return;
 
-        if (int.TryParse(e.Value.ToString(), out var admissionUnitId))
-        {
-            LoadAdmissionUnitForEdit(admissionUnitId);
-        }
+        LoadAdmissionUnitForEdit(admissionUnitId);
     }
 
     // This helper loads the selected catalog row into the edit textbox.
@@ -471,7 +470,7 @@
 
             await RefreshAdmissionUnitsAsync();
 
-            // Reload the selected row from the refreshed list so the modal has the saved value.
+            // Reload the selected row from the refreshed list so the panel has the saved value.
             LoadAdmissionUnitForEdit(selectedAdmissionUnitToEditId);
 
             showEditAdmissionUnitModal = false;

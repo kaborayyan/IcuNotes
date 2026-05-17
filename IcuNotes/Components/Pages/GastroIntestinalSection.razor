@@ -1,293 +1,329 @@
 ﻿@using IcuNotes.Models
 @using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
 @using System.Runtime.CompilerServices
 
 @* This component contains the Gastrointestinal Tract section UI.
-   It uses Bootstrap for a compact mobile layout and avoids JavaScript.
-   The parent PatientDetails page still owns saving, reloading, and dirty tracking. *@
+   Saving, reloading, and dirty tracking are controlled by PatientDetails.razor.
+
+   Important:
+   - This component edits GIT data only.
+   - It does not directly save to the database.
+   - The parent page owns saving, dirty tracking, and reload.
+   - This update is UI-only: Bootstrap has been replaced with MudBlazor. *@
+
 @if (Patient?.GastroIntestinal is not null)
 {
-    <div class="card border-0 shadow-sm mb-3">
-        <div class="card-body p-2 p-sm-3">
-            <div class="mb-2">
-                <h6 class="mb-0">GIT</h6>
-                <div class="form-text small">
-                    Gastrointestinal tract, feeding, fluids, abdomen, and related medications.
-                </div>
-            </div>
+    <EditForm EditContext="GastroIntestinalEditContext">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
 
-            @* This form edits the GIT section fields.
-               The fixed bottom bar in PatientDetails handles Save and Reload. *@
-            <EditForm EditContext="GastroIntestinalEditContext">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
+        <MudStack Spacing="3">
 
-                @* Basic GIT fields. *@
-                <div class="card mb-2">
-                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
-                        <h6 class="mb-0">Assessment</h6>
-                    </div>
+            @* Section heading.
+               The fixed PatientDetailsActionBar still handles Save and Reload. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.h6">Gastrointestinal</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Feeding route, bowel motion, abdomen, fluids, formula, and GIT medications.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
 
-                    <div class="card-body p-2 p-sm-3">
-                        <div class="row g-2">
-                            <div class="col-12 col-sm-6 col-md-4">
-                                <div class="form-floating">
-                                    <InputSelect class="form-select"
-                                                 @bind-Value="Patient.GastroIntestinal.FeedingRoute">
-                                        @foreach (var route in FeedingRouteOptions)
-                                        {
-                                            <option value="@route">@route</option>
-                                        }
-                                    </InputSelect>
-                                    <label>Feeding route</label>
-                                </div>
-                            </div>
+            @* Main GIT assessment fields.
+               Short numeric values are grouped together to save vertical space on mobile. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">
+                        Assessment
+                    </MudText>
 
-                            <div class="col-12 col-sm-6 col-md-4">
-                                <div class="form-floating">
-                                    <InputDate TValue="DateTime?"
-                                               class="form-control"
-                                               placeholder=" "
-                                               @bind-Value="Patient.GastroIntestinal.LastBowelMotionDate" />
-                                    <label>Last bowel motion</label>
-                                </div>
-                            </div>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string"
+                                       Label="Feeding route"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       FullWidth="true"
+                                       Disabled="@IsSaving"
+                                       Value="@Patient.GastroIntestinal.FeedingRoute"
+                                       ValueChanged="UpdateFeedingRoute">
+                                @foreach (var route in FeedingRouteOptions)
+                                {
+                                    <MudSelectItem T="string" Value="@route">
+                                        @route
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
 
-                            <div class="col-6 col-md-2">
-                                <div class="form-floating">
-                                    <InputNumber TValue="int?"
-                                                 class="form-control"
-                                                 placeholder=" "
-                                                 @bind-Value="Patient.GastroIntestinal.IntraAbdominalPressure" />
-                                    <label>IAP</label>
-                                </div>
-                                <div class="form-text small">mmHg</div>
-                            </div>
+                        <MudItem xs="12" sm="6">
+                            <MudDatePicker Label="Last bowel motion"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Disabled="@IsSaving"
+                                           Date="Patient.GastroIntestinal.LastBowelMotionDate"
+                                           DateChanged="UpdateLastBowelMotionDate" />
+                        </MudItem>
 
-                            <div class="col-6 col-md-2">
-                                <div class="form-floating">
-                                    <InputNumber TValue="int?"
-                                                 class="form-control"
-                                                 placeholder=" "
-                                                 @bind-Value="Patient.GastroIntestinal.AbdominalGirth" />
-                                    <label>Girth</label>
-                                </div>
-                                <div class="form-text small">cm</div>
-                            </div>
+                        <MudItem xs="6">
+                            <MudNumericField T="int?"
+                                             Label="IAP"
+                                             HelperText="mmHg"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             Disabled="@IsSaving"
+                                             Value="Patient.GastroIntestinal.IntraAbdominalPressure"
+                                             ValueChanged="UpdateIntraAbdominalPressure" />
+                        </MudItem>
 
-                            <div class="col-12">
-                                <div class="form-check form-switch border rounded px-5 py-2 mb-0">
-                                    <InputCheckbox class="form-check-input"
-                                                   role="switch"
-                                                   @bind-Value="Patient.GastroIntestinal.HasGiBleeding" />
-                                    <label class="form-check-label fw-semibold">
-                                        GI bleeding
-                                    </label>
-                                </div>
-                            </div>
+                        <MudItem xs="6">
+                            <MudNumericField T="int?"
+                                             Label="Girth"
+                                             HelperText="cm"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             Disabled="@IsSaving"
+                                             Value="Patient.GastroIntestinal.AbdominalGirth"
+                                             ValueChanged="UpdateAbdominalGirth" />
+                        </MudItem>
+                    </MudGrid>
 
-                            <div class="col-12">
-                                <div class="form-floating">
-                                    <InputTextArea class="form-control"
-                                                   placeholder=" "
-                                                   style="height: 7rem"
-                                                   @bind-Value="Patient.GastroIntestinal.GitNotes" />
-                                    <label>GIT notes</label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    <MudSwitch T="bool"
+                               Label="GI bleeding"
+                               Color="Color.Error"
+                               Disabled="@IsSaving"
+                               Value="Patient.GastroIntestinal.HasGiBleeding"
+                               ValueChanged="UpdateHasGiBleeding" />
 
-                @* This reusable manager handles adding and editing shared catalog items.
-                   We are using the same catalog for formulas, IV fluids, and medications. *@
-                <MedicationsManager Medications="Medications"
-                                    IsDisabled="IsSaving"
-                                    OnMedicationsChanged="HandleMedicationsChangedAsync"
-                                    OnStatusMessage="HandleStatusMessageAsync" />
+                    <MudTextField T="string"
+                                  Label="GIT notes"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Lines="5"
+                                  FullWidth="true"
+                                  Disabled="@IsSaving"
+                                  Value="@Patient.GastroIntestinal.GitNotes"
+                                  ValueChanged="UpdateGitNotes" />
+                </MudStack>
+            </MudPaper>
 
-                @* Formula rows. Each row uses a Blazor-only searchable picker. *@
-                <div class="card mb-2">
-                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
-                        <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2">
-                            <h6 class="mb-0">Formula</h6>
+            @* This reusable manager handles adding and editing shared catalog items.
+               The same catalog is reused for formulas, IV fluids, and medications. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">
+                        Shared Catalog
+                    </MudText>
 
-                            <div class="d-grid d-sm-block">
-                                <button type="button"
-                                        class="btn btn-outline-primary btn-sm"
-                                        @onclick="() => HandleAddGastroIntestinalItemAsync(GastroIntestinalItemCategory.Formula)"
-                                        disabled="@IsSaving">
-                                    Add Formula
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <MedicationsManager Medications="Medications"
+                                        IsDisabled="IsSaving"
+                                        OnMedicationsChanged="HandleMedicationsChangedAsync"
+                                        OnStatusMessage="HandleStatusMessageAsync" />
+                </MudStack>
+            </MudPaper>
 
-                    <div class="card-body p-2 p-sm-3">
-                        @if (GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.Formula).Any())
+            @* Formula rows. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">
+                            Formula
+                        </MudText>
+
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Disabled="@IsSaving"
+                                   OnClick="@(() => HandleAddGastroIntestinalItemAsync(GastroIntestinalItemCategory.Formula))">
+                            Add
+                        </MudButton>
+                    </MudStack>
+
+                    @if (GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.Formula).Any())
+                    {
+                        @foreach (var item in GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.Formula))
                         {
-                            @foreach (var item in GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.Formula))
-                            {
-                                <div class="border rounded p-2 mb-2" @key="item">
-                                    <div class="row g-2 align-items-stretch">
-                                        <div class="col-12 col-md-7">
-                                            @RenderSearchableCatalogPicker(item, "Search formula...")
-                                        </div>
+                            <MudPaper Elevation="0" Outlined="true" Class="pa-2" @key="item">
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" sm="7">
+                                        @RenderSearchableCatalogPicker(item, "Search formula...")
+                                    </MudItem>
 
-                                        <div class="col-7 col-md-3">
-                                            <div class="form-floating">
-                                                <InputNumber TValue="decimal?"
-                                                             class="form-control"
-                                                             placeholder=" "
-                                                             @bind-Value="item.DoseOrRate" />
-                                                <label>Rate ml/hr</label>
-                                            </div>
-                                        </div>
+                                    <MudItem xs="8" sm="3">
+                                        <MudNumericField T="decimal?"
+                                                         Label="Rate"
+                                                         HelperText="ml/hr"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         FullWidth="true"
+                                                         Disabled="@IsSaving"
+                                                         Value="item.DoseOrRate"
+                                                         ValueChanged="@((decimal? value) => UpdateGastroIntestinalItemDoseOrRate(item, value))" />
+                                    </MudItem>
 
-                                        <div class="col-5 col-md-2 d-grid">
-                                            <button type="button"
-                                                    class="btn btn-outline-danger btn-sm h-100"
-                                                    @onclick="() => HandleRemoveGastroIntestinalItemAsync(item)"
-                                                    disabled="@IsSaving">
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
+                                    <MudItem xs="4" sm="2">
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   FullWidth="true"
+                                                   Disabled="@IsSaving"
+                                                   OnClick="@(() => HandleRemoveGastroIntestinalItemAsync(item))">
+                                            Remove
+                                        </MudButton>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
                         }
-                        else
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
+                            No formula rows added yet.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudPaper>
+
+            @* IV fluid rows. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">
+                            IV Fluids
+                        </MudText>
+
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Disabled="@IsSaving"
+                                   OnClick="@(() => HandleAddGastroIntestinalItemAsync(GastroIntestinalItemCategory.IVFluid))">
+                            Add
+                        </MudButton>
+                    </MudStack>
+
+                    @if (GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.IVFluid).Any())
+                    {
+                        @foreach (var item in GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.IVFluid))
                         {
-                            <div class="alert alert-light border py-2 px-2 mb-0 small">
-                                No formula rows added yet.
-                            </div>
+                            <MudPaper Elevation="0" Outlined="true" Class="pa-2" @key="item">
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" sm="7">
+                                        @RenderSearchableCatalogPicker(item, "Search IV fluid...")
+                                    </MudItem>
+
+                                    <MudItem xs="8" sm="3">
+                                        <MudNumericField T="decimal?"
+                                                         Label="Rate"
+                                                         HelperText="ml/hr"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         FullWidth="true"
+                                                         Disabled="@IsSaving"
+                                                         Value="item.DoseOrRate"
+                                                         ValueChanged="@((decimal? value) => UpdateGastroIntestinalItemDoseOrRate(item, value))" />
+                                    </MudItem>
+
+                                    <MudItem xs="4" sm="2">
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   FullWidth="true"
+                                                   Disabled="@IsSaving"
+                                                   OnClick="@(() => HandleRemoveGastroIntestinalItemAsync(item))">
+                                            Remove
+                                        </MudButton>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
                         }
-                    </div>
-                </div>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
+                            No IV fluid rows added yet.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudPaper>
 
-                @* IV fluid rows. These also use the shared catalog and the same searchable picker. *@
-                <div class="card mb-2">
-                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
-                        <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2">
-                            <h6 class="mb-0">IV Fluids</h6>
+            @* Other GIT medication rows. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">
+                            Other GIT Medications
+                        </MudText>
 
-                            <div class="d-grid d-sm-block">
-                                <button type="button"
-                                        class="btn btn-outline-primary btn-sm"
-                                        @onclick="() => HandleAddGastroIntestinalItemAsync(GastroIntestinalItemCategory.IVFluid)"
-                                        disabled="@IsSaving">
-                                    Add IV Fluid
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Disabled="@IsSaving"
+                                   OnClick="@(() => HandleAddGastroIntestinalItemAsync(GastroIntestinalItemCategory.OtherMedication))">
+                            Add
+                        </MudButton>
+                    </MudStack>
 
-                    <div class="card-body p-2 p-sm-3">
-                        @if (GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.IVFluid).Any())
+                    @if (GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.OtherMedication).Any())
+                    {
+                        @foreach (var item in GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.OtherMedication))
                         {
-                            @foreach (var item in GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.IVFluid))
-                            {
-                                <div class="border rounded p-2 mb-2" @key="item">
-                                    <div class="row g-2 align-items-stretch">
-                                        <div class="col-12 col-md-7">
-                                            @RenderSearchableCatalogPicker(item, "Search IV fluid...")
-                                        </div>
+                            <MudPaper Elevation="0" Outlined="true" Class="pa-2" @key="item">
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" sm="7">
+                                        @RenderSearchableCatalogPicker(item, "Search medication...")
+                                    </MudItem>
 
-                                        <div class="col-7 col-md-3">
-                                            <div class="form-floating">
-                                                <InputNumber TValue="decimal?"
-                                                             class="form-control"
-                                                             placeholder=" "
-                                                             @bind-Value="item.DoseOrRate" />
-                                                <label>Rate ml/hr</label>
-                                            </div>
-                                        </div>
+                                    <MudItem xs="8" sm="3">
+                                        <MudNumericField T="decimal?"
+                                                         Label="Dose"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         FullWidth="true"
+                                                         Disabled="@IsSaving"
+                                                         Value="item.DoseOrRate"
+                                                         ValueChanged="@((decimal? value) => UpdateGastroIntestinalItemDoseOrRate(item, value))" />
+                                    </MudItem>
 
-                                        <div class="col-5 col-md-2 d-grid">
-                                            <button type="button"
-                                                    class="btn btn-outline-danger btn-sm h-100"
-                                                    @onclick="() => HandleRemoveGastroIntestinalItemAsync(item)"
-                                                    disabled="@IsSaving">
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
+                                    <MudItem xs="4" sm="2">
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   FullWidth="true"
+                                                   Disabled="@IsSaving"
+                                                   OnClick="@(() => HandleRemoveGastroIntestinalItemAsync(item))">
+                                            Remove
+                                        </MudButton>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
                         }
-                        else
-                        {
-                            <div class="alert alert-light border py-2 px-2 mb-0 small">
-                                No IV fluid rows added yet.
-                            </div>
-                        }
-                    </div>
-                </div>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
+                            No other GIT medications added yet.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudPaper>
 
-                @* Other GIT medication rows. These rows store patient-specific doses. *@
-                <div class="card mb-0">
-                    <div class="card-header py-2 px-2 px-sm-3 bg-light">
-                        <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2">
-                            <h6 class="mb-0">Other GIT Medications</h6>
-
-                            <div class="d-grid d-sm-block">
-                                <button type="button"
-                                        class="btn btn-outline-primary btn-sm"
-                                        @onclick="() => HandleAddGastroIntestinalItemAsync(GastroIntestinalItemCategory.OtherMedication)"
-                                        disabled="@IsSaving">
-                                    Add Medication
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card-body p-2 p-sm-3">
-                        @if (GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.OtherMedication).Any())
-                        {
-                            @foreach (var item in GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory.OtherMedication))
-                            {
-                                <div class="border rounded p-2 mb-2" @key="item">
-                                    <div class="row g-2 align-items-stretch">
-                                        <div class="col-12 col-md-7">
-                                            @RenderSearchableCatalogPicker(item, "Search medication...")
-                                        </div>
-
-                                        <div class="col-7 col-md-3">
-                                            <div class="form-floating">
-                                                <InputNumber TValue="decimal?"
-                                                             class="form-control"
-                                                             placeholder=" "
-                                                             @bind-Value="item.DoseOrRate" />
-                                                <label>Dose</label>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-5 col-md-2 d-grid">
-                                            <button type="button"
-                                                    class="btn btn-outline-danger btn-sm h-100"
-                                                    @onclick="() => HandleRemoveGastroIntestinalItemAsync(item)"
-                                                    disabled="@IsSaving">
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
-                        }
-                        else
-                        {
-                            <div class="alert alert-light border py-2 px-2 mb-0 small">
-                                No other GIT medications added yet.
-                            </div>
-                        }
-                    </div>
-                </div>
-
-                @* Save and reload buttons are intentionally not here.
-                   PatientDetails shows them in the fixed bottom bar. *@
-            </EditForm>
-        </div>
-    </div>
+            @* Save and reload buttons are intentionally not here.
+               The fixed PatientDetailsActionBar controls saving and reloading. *@
+        </MudStack>
+    </EditForm>
+}
+else
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+        Gastrointestinal section is not ready for this patient.
+    </MudAlert>
 }
 
 @code {
@@ -337,7 +373,7 @@
         "PEG"
     };
 
-    // Each row can have its own search text.
+    // Each GIT row can have its own catalog search text.
     // The key is stable for saved rows by database Id and stable for new rows by object reference.
     private readonly Dictionary<string, string> searchTextByItemKey = new();
 
@@ -345,6 +381,9 @@
     private async Task HandleAddGastroIntestinalItemAsync(GastroIntestinalItemCategory category)
     {
         await OnAddGastroIntestinalItem.InvokeAsync(category);
+
+        // Adding a row changes patient-specific GIT data, so the bottom Save button should enable.
+        NotifyGastroIntestinalFieldChanged(nameof(GastroIntestinal.Items));
     }
 
     // This method asks the parent page to remove one GIT row.
@@ -352,6 +391,9 @@
     {
         searchTextByItemKey.Remove(GetItemKey(item));
         await OnRemoveGastroIntestinalItem.InvokeAsync(item);
+
+        // Removing a row changes patient-specific GIT data, so the bottom Save button should enable.
+        NotifyGastroIntestinalFieldChanged(nameof(GastroIntestinal.Items));
     }
 
     // This method receives the refreshed medication catalog from MedicationsManager.
@@ -369,6 +411,89 @@
         await OnStatusMessage.InvokeAsync(message);
     }
 
+    // The methods below replace plain @bind-Value usage.
+    // MudBlazor updates the model correctly, but explicit handlers let us also notify
+    // the parent EditContext so PatientDetails.razor can enable the fixed bottom Save button.
+
+    private void UpdateFeedingRoute(string? value)
+    {
+        if (Patient?.GastroIntestinal is null)
+            return;
+
+        Patient.GastroIntestinal.FeedingRoute = value;
+        NotifyGastroIntestinalFieldChanged(nameof(GastroIntestinal.FeedingRoute));
+    }
+
+    private void UpdateLastBowelMotionDate(DateTime? value)
+    {
+        if (Patient?.GastroIntestinal is null)
+            return;
+
+        Patient.GastroIntestinal.LastBowelMotionDate = value;
+        NotifyGastroIntestinalFieldChanged(nameof(GastroIntestinal.LastBowelMotionDate));
+    }
+
+    private void UpdateIntraAbdominalPressure(int? value)
+    {
+        if (Patient?.GastroIntestinal is null)
+            return;
+
+        Patient.GastroIntestinal.IntraAbdominalPressure = value;
+        NotifyGastroIntestinalFieldChanged(nameof(GastroIntestinal.IntraAbdominalPressure));
+    }
+
+    private void UpdateAbdominalGirth(int? value)
+    {
+        if (Patient?.GastroIntestinal is null)
+            return;
+
+        Patient.GastroIntestinal.AbdominalGirth = value;
+        NotifyGastroIntestinalFieldChanged(nameof(GastroIntestinal.AbdominalGirth));
+    }
+
+    private void UpdateHasGiBleeding(bool value)
+    {
+        if (Patient?.GastroIntestinal is null)
+            return;
+
+        Patient.GastroIntestinal.HasGiBleeding = value;
+        NotifyGastroIntestinalFieldChanged(nameof(GastroIntestinal.HasGiBleeding));
+    }
+
+    private void UpdateGitNotes(string? value)
+    {
+        if (Patient?.GastroIntestinal is null)
+            return;
+
+        Patient.GastroIntestinal.GitNotes = value;
+        NotifyGastroIntestinalFieldChanged(nameof(GastroIntestinal.GitNotes));
+    }
+
+    private void UpdateGastroIntestinalItemDoseOrRate(GastroIntestinalItem item, decimal? value)
+    {
+        item.DoseOrRate = value;
+        NotifyGastroIntestinalItemFieldChanged(item, nameof(GastroIntestinalItem.DoseOrRate));
+    }
+
+    // Notify the EditContext about a field that belongs directly to the GIT section.
+    // PatientDetails.razor listens to this EditContext and marks the GIT section dirty.
+    private void NotifyGastroIntestinalFieldChanged(string fieldName)
+    {
+        if (Patient?.GastroIntestinal is null)
+            return;
+
+        GastroIntestinalEditContext.NotifyFieldChanged(
+            new FieldIdentifier(Patient.GastroIntestinal, fieldName));
+    }
+
+    // Notify the EditContext about a field that belongs to one GIT row.
+    // This is used for formula, IV fluid, and other GIT medication rows.
+    private void NotifyGastroIntestinalItemFieldChanged(GastroIntestinalItem item, string fieldName)
+    {
+        GastroIntestinalEditContext.NotifyFieldChanged(
+            new FieldIdentifier(item, fieldName));
+    }
+
     // This helper returns only one visible group of GIT rows at a time.
     private IEnumerable<GastroIntestinalItem> GetGastroIntestinalItemsByCategory(GastroIntestinalItemCategory category)
     {
@@ -382,59 +507,63 @@
 
     // This is the Blazor-only searchable picker used by formula, IV fluid,
     // and other medication rows.
-    private RenderFragment RenderSearchableCatalogPicker(GastroIntestinalItem item, string placeholder) => @<div>
+    // It is intentionally not a JavaScript autocomplete.
+    private RenderFragment RenderSearchableCatalogPicker(GastroIntestinalItem item, string placeholder) => @<MudStack Spacing="1">
         @if (item.MedicationId > 0)
         {
-            <div class="alert alert-light border py-1 px-2 mb-2 small d-flex justify-content-between align-items-center gap-2">
-                <span>
-                    <span class="fw-semibold">Selected:</span>
-                    @GetMedicationName(item.MedicationId)
-                </span>
+            <MudPaper Elevation="0" Outlined="true" Class="pa-2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                    <MudText Typo="Typo.body2">
+                        <strong>Selected:</strong> @GetMedicationName(item.MedicationId)
+                    </MudText>
 
-                @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
-                {
-                    <span class="text-muted text-nowrap">
-                        @GetMedicationFrequency(item.MedicationId)
-                    </span>
-                }
-            </div>
+                    @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info">
+                            @GetMedicationFrequency(item.MedicationId)
+                        </MudChip>
+                    }
+                </MudStack>
+            </MudPaper>
         }
 
-        <input type="search"
-               class="form-control form-control-sm"
-               placeholder="@placeholder"
-               value="@GetSearchText(item)"
-               disabled="@IsSaving"
-               @oninput="e => SetSearchText(item, e.Value?.ToString())" />
+        <MudTextField T="string"
+                      Label="@placeholder"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      FullWidth="true"
+                      Immediate="true"
+                      Disabled="@IsSaving"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Value="@GetSearchText(item)"
+                      ValueChanged="@((string value) => SetSearchText(item, value))" />
 
         @if (ShouldShowSearchResults(item))
         {
-            <div class="list-group mt-1">
-                @foreach (var medication in GetFilteredMedications(item))
-                {
-                    <button type="button"
-                            class="list-group-item list-group-item-action py-2 px-2 small @(item.MedicationId == medication.Id ? "active" : string.Empty)"
-                            @onclick="() => SelectMedicationForItemAsync(item, medication)"
-                            disabled="@IsSaving">
-                        <div class="d-flex justify-content-between align-items-center gap-2">
-                            <span>@medication.Name</span>
-
-                            @if (!string.IsNullOrWhiteSpace(medication.Frequency))
-                            {
-                                <span class="small opacity-75 text-nowrap">@medication.Frequency</span>
-                            }
-                        </div>
-                    </button>
-                }
-            </div>
+            <MudPaper Elevation="0" Outlined="true" Class="pa-1">
+                <MudStack Spacing="1">
+                    @foreach (var medication in GetFilteredMedications(item))
+                    {
+                        <MudButton Variant="@GetCatalogButtonVariant(item, medication)"
+                                   Color="@GetCatalogButtonColor(item, medication)"
+                                   Size="Size.Small"
+                                   FullWidth="true"
+                                   Disabled="@IsSaving"
+                                   OnClick="@(() => SelectMedicationForItemAsync(item, medication))">
+                            @GetMedicationSearchDisplay(medication)
+                        </MudButton>
+                    }
+                </MudStack>
+            </MudPaper>
         }
         else if (item.MedicationId <= 0)
         {
-            <div class="form-text small">
-                Type to search the medication catalog.
-            </div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Type to search the shared catalog.
+            </MudText>
         }
-    </div>;
+    </MudStack>;
 
     // Store the current search text for a row.
     private void SetSearchText(GastroIntestinalItem item, string? value)
@@ -474,7 +603,7 @@
     }
 
     // Select the exact catalog item by Id.
-    // This is the main advantage over datalist: we do not guess by typed text.
+    // This avoids guessing based on free text.
     private async Task SelectMedicationForItemAsync(GastroIntestinalItem item, Medication medication)
     {
         item.MedicationId = medication.Id;
@@ -484,8 +613,7 @@
 
         // Tell the parent EditContext that this row changed.
         // This activates the Unsaved badge and fixed bottom Save button behavior.
-        GastroIntestinalEditContext.NotifyFieldChanged(
-            new FieldIdentifier(item, nameof(item.MedicationId)));
+        NotifyGastroIntestinalItemFieldChanged(item, nameof(GastroIntestinalItem.MedicationId));
 
         await InvokeAsync(StateHasChanged);
     }
@@ -510,6 +638,35 @@
         return Medications
             .FirstOrDefault(x => x.Id == medicationId)
             ?.Frequency;
+    }
+
+    // Display the catalog item in search results.
+    private static string GetMedicationSearchDisplay(Medication medication)
+    {
+        var name = string.IsNullOrWhiteSpace(medication.Name)
+            ? "Unnamed catalog item"
+            : medication.Name!;
+
+        if (string.IsNullOrWhiteSpace(medication.Frequency))
+            return name;
+
+        return $"{name} - {medication.Frequency}";
+    }
+
+    // Highlight the selected search result.
+    private Variant GetCatalogButtonVariant(GastroIntestinalItem item, Medication medication)
+    {
+        return item.MedicationId == medication.Id
+            ? Variant.Filled
+            : Variant.Text;
+    }
+
+    // Highlight the selected search result.
+    private Color GetCatalogButtonColor(GastroIntestinalItem item, Medication medication)
+    {
+        return item.MedicationId == medication.Id
+            ? Color.Primary
+            : Color.Default;
     }
 
     // This gives each row a stable key for its search box text.

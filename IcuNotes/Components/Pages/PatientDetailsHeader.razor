@@ -1,0 +1,299 @@
+﻿@using MudBlazor
+
+@*
+    PatientDetailsHeader.razor
+
+    This component contains only the patient identity header and the
+    horizontally scrollable section navigation buttons.
+
+    Important design rule:
+    - This component is UI-only.
+    - It does not know how to load, save, or reload a patient.
+    - It does not access the database, services, or EditContext objects.
+    - The parent page, PatientDetails.razor, still owns all logic.
+*@
+
+<MudPaper Elevation="2"
+          Class="patient-details-header">
+
+    @* Patient identity row.
+       This row stays compact because the app is mobile-first. *@
+    <MudStack Row="true"
+              AlignItems="AlignItems.Center"
+              Spacing="1"
+              Class="patient-details-identity-row">
+
+        @if (ShowBackButton)
+        {
+            @* The back button is a normal link.
+               It does not require JavaScript. *@
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                           Color="Color.Primary"
+                           Size="Size.Small"
+                           Href="@BackHref"
+                           AriaLabel="Back to active patients" />
+        }
+
+        <MudAvatar Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Size="Size.Small">
+            @PatientInitial
+        </MudAvatar>
+
+        <MudStack Spacing="0"
+                  Class="min-width-0 flex-grow-1">
+            <MudText Typo="Typo.subtitle2"
+                     Class="patient-details-header-name">
+                @PatientName
+            </MudText>
+
+            <MudText Typo="Typo.caption"
+                     Color="Color.Secondary">
+                Patient sections
+            </MudText>
+        </MudStack>
+
+        @if (!string.IsNullOrWhiteSpace(Bed))
+        {
+            <MudChip T="string"
+                     Size="Size.Small"
+                     Color="Color.Info"
+                     Variant="Variant.Outlined"
+                     Icon="@Icons.Material.Filled.LocalHotel">
+                Bed @Bed
+            </MudChip>
+        }
+        else
+        {
+            <MudChip T="string"
+                     Size="Size.Small"
+                     Color="Color.Default"
+                     Variant="Variant.Outlined"
+                     Icon="@Icons.Material.Filled.LocalHotel">
+                No bed
+            </MudChip>
+        }
+
+    </MudStack>
+
+    @* Horizontal section navigation.
+       This is intentionally not a MudTabs panel yet.
+       The parent page already controls which section is rendered through ActiveSection.
+       Keeping this as buttons makes the migration safer. *@
+    <div class="patient-details-section-scroll"
+         role="tablist"
+         aria-label="Patient sections">
+
+        @foreach (var section in Sections)
+        {
+            var isActive = ActiveSection == section.Key;
+            var isDirty = IsSectionDirty(section.Key);
+
+            <MudButton Variant="@(isActive ? Variant.Filled : Variant.Outlined)"
+                       Color="@(isActive ? Color.Primary : Color.Default)"
+                       Size="Size.Small"
+                       Class="patient-details-section-button"
+                       OnClick="@(() => SelectSectionAsync(section.Key))">
+
+                <MudStack Row="true"
+                          AlignItems="AlignItems.Center"
+                          Spacing="1">
+                    <span>@section.Label</span>
+
+                    @if (isDirty)
+                    {
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Color="Color.Warning"
+                                 Variant="Variant.Filled"
+                                 Class="patient-details-unsaved-chip">
+                            @GetUnsavedText(section.Key)
+                        </MudChip>
+                    }
+                </MudStack>
+
+            </MudButton>
+        }
+
+    </div>
+
+</MudPaper>
+
+@code {
+    // Patient name shown in the compact identity row.
+    [Parameter]
+    public string? PatientName { get; set; }
+
+    // Bed location shown as a small chip.
+    [Parameter]
+    public string? Bed { get; set; }
+
+    // The currently selected section key, for example: "overview".
+    [Parameter]
+    public string ActiveSection { get; set; } = "overview";
+
+    // Tells the parent page which section the user selected.
+    [Parameter]
+    public EventCallback<string> OnSectionChanged { get; set; }
+
+    // Dirty flags are still owned by PatientDetails.razor.
+    // This component only displays them.
+    [Parameter]
+    public bool IsOverviewDirty { get; set; }
+
+    [Parameter]
+    public bool IsTimelineDirty { get; set; }
+
+    [Parameter]
+    public bool IsSummaryDirty { get; set; }
+
+    [Parameter]
+    public bool IsNeurologyDirty { get; set; }
+
+    [Parameter]
+    public bool IsCardiologyDirty { get; set; }
+
+    [Parameter]
+    public bool IsGastroIntestinalDirty { get; set; }
+
+    // The header can show a back button to the active patients page.
+    // We keep it configurable in case we want to hide it later.
+    [Parameter]
+    public bool ShowBackButton { get; set; } = true;
+
+    [Parameter]
+    public string BackHref { get; set; } = "/patients";
+
+    // Patient initial used in the avatar.
+    private string PatientInitial
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(PatientName))
+                return "?";
+
+            return PatientName.Trim()[0].ToString().ToUpperInvariant();
+        }
+    }
+
+    // The available sections are defined here because this component owns the
+    // visual section navigation.
+    private static readonly IReadOnlyList<PatientSectionTab> Sections =
+    [
+        new("overview", "Overview"),
+        new("summary", "Summary"),
+        new("neurology", "Neurology"),
+        new("cardiology", "Cardiology"),
+        new("gastrointestinal", "GIT")
+    ];
+
+    private async Task SelectSectionAsync(string sectionKey)
+    {
+        if (sectionKey == ActiveSection)
+            return;
+
+        await OnSectionChanged.InvokeAsync(sectionKey);
+    }
+
+    private bool IsSectionDirty(string sectionKey)
+    {
+        return sectionKey switch
+        {
+            "overview" => IsOverviewDirty || IsTimelineDirty,
+            "summary" => IsSummaryDirty,
+            "neurology" => IsNeurologyDirty,
+            "cardiology" => IsCardiologyDirty,
+            "gastrointestinal" => IsGastroIntestinalDirty,
+            _ => false
+        };
+    }
+
+    private string GetUnsavedText(string sectionKey)
+    {
+        if (sectionKey == "overview")
+        {
+            if (IsOverviewDirty && IsTimelineDirty)
+                return "2";
+
+            return "Unsaved";
+        }
+
+        return "Unsaved";
+    }
+
+    private sealed record PatientSectionTab(string Key, string Label);
+}
+
+<style>
+    /*
+            Sticky header for the patient details page.
+
+            MainLayout already offsets the page below the fixed MudAppBar.
+            The sticky top value is used only when the user scrolls, so the
+            patient header remains just below the top app bar instead of hiding
+            behind it.
+
+            The value uses the same CSS variables as MainLayout:
+            - --mud-appbar-height is the standard MudBlazor app bar height.
+            - --app-safe-top is 24px on Android and normal env(...) elsewhere.
+        */
+    .patient-details-header {
+        position: sticky;
+        top: calc(var(--mud-appbar-height, 64px) + var(--app-safe-top, 0px));
+        z-index: 1000;
+        border-radius: 16px;
+        padding: 0.5rem 0.5rem 0.35rem;
+        margin-bottom: 0.5rem;
+        background-color: var(--mud-palette-surface);
+    }
+
+    /*
+            Compact patient identity row.
+            Keeping this small reduces the dead space above the section content.
+        */
+    .patient-details-identity-row {
+        margin-bottom: 0.35rem;
+    }
+
+    /*
+            Prevent long patient names from widening the mobile layout.
+        */
+    .patient-details-header-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /*
+            Horizontal scroll is still enabled, but the visible scrollbar is hidden.
+            This keeps the tab row clean on mobile while preserving swipe scrolling.
+        */
+    .patient-details-section-scroll {
+        display: flex;
+        gap: 0.5rem;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 0;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+        .patient-details-section-scroll::-webkit-scrollbar {
+            display: none;
+            width: 0;
+            height: 0;
+        }
+
+    .patient-details-section-button {
+        flex: 0 0 auto;
+        border-radius: 999px;
+        text-transform: none;
+        white-space: nowrap;
+    }
+
+    .patient-details-unsaved-chip {
+        height: 18px;
+        font-size: 0.65rem;
+    }
+</style>

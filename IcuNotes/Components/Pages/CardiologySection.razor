@@ -1,357 +1,403 @@
 ﻿@using IcuNotes.Models
 @using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
 
 @* This component contains the Cardiology section UI.
-   Saving and reloading are controlled by the fixed bottom bar in PatientDetails.razor.
+   Saving and reloading are controlled by PatientDetails.razor.
 
    Important:
-   - This component displays and edits cardiology data only.
+   - This component edits cardiology data only.
    - It does not directly save to the database.
-   - The parent PatientDetails.razor page owns saving, dirty tracking, and reload.
-   - This update is UI-only: Bootstrap cards, compact spacing, and floating labels. *@
+   - The parent page owns saving, dirty tracking, and reload.*@
 
 @if (Patient?.Cardiology is not null)
 {
-    <div class="card shadow-sm">
-        <div class="card-body p-2 p-sm-3">
-            @* Small section heading.
-               The saved/unsaved message now lives in the fixed bottom bar in PatientDetails.razor. *@
-            <h6 class="card-title mb-2">Cardiology</h6>
-                        
-            @* This form edits the cardiology fields.
-               The EditContext still allows PatientDetails.razor to detect field changes. *@
-            <EditForm EditContext="CardiologyEditContext">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
+    <EditForm EditContext="CardiologyEditContext">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
 
-                @* Core daily cardiovascular observations.
-                   HR, SBP, and DBP are short numeric values, so they are kept narrow on mobile too. *@
-                <div class="card mb-2">
-                    <div class="card-body p-2 p-sm-3">
-                        <h6 class="mb-2 small text-uppercase text-muted">Basic Hemodynamics</h6>
+        <MudStack Spacing="3">
 
-                        <div class="row g-2">
-                            <div class="col-4">
-                                <div class="form-floating">
-                                    <InputNumber id="cardiologyHeartRate"
-                                                 TValue="int?"
-                                                 class="form-control"
-                                                 placeholder=" "
-                                                 @bind-Value="Patient.Cardiology.HeartRate" />
-                                    <label for="cardiologyHeartRate">HR</label>
-                                </div>
-                            </div>
+            @* Section heading.
+               The saved/unsaved message lives in the fixed bottom action bar. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.h6">Cardiology</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Daily cardiovascular observations, hemodynamics, and cardiovascular medications.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
 
-                            <div class="col-4">
-                                <div class="form-floating">
-                                    <InputNumber id="cardiologySbp"
-                                                 TValue="int?"
-                                                 class="form-control"
-                                                 placeholder=" "
-                                                 @bind-Value="Patient.Cardiology.SystolicBloodPressure" />
-                                    <label for="cardiologySbp">SBP</label>
-                                </div>
-                            </div>
+            @* Core daily cardiovascular observations.
+               HR, SBP, and DBP are short numeric values, so a 3-column layout works well on mobile. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">
+                        Basic Hemodynamics
+                    </MudText>
 
-                            <div class="col-4">
-                                <div class="form-floating">
-                                    <InputNumber id="cardiologyDbp"
-                                                 TValue="int?"
-                                                 class="form-control"
-                                                 placeholder=" "
-                                                 @bind-Value="Patient.Cardiology.DiastolicBloodPressure" />
-                                    <label for="cardiologyDbp">DBP</label>
-                                </div>
-                            </div>
-                        </div>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="4">
+                            <MudNumericField T="int?"
+                                             Label="HR"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             Disabled="@IsSaving"
+                                             Value="Patient.Cardiology.HeartRate"
+                                             ValueChanged="HandleHeartRateChanged" />
+                        </MudItem>
 
-                        @* MAP is calculated in Cardiology.cs.
-                           It is not directly edited and not stored in the database. *@
-                        <div class="alert alert-light border p-2 mt-2 mb-0 small">
-                            <span class="fw-semibold">MAP:</span>
+                        <MudItem xs="4">
+                            <MudNumericField T="int?"
+                                             Label="SBP"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             Disabled="@IsSaving"
+                                             Value="Patient.Cardiology.SystolicBloodPressure"
+                                             ValueChanged="HandleSystolicBloodPressureChanged" />
+                        </MudItem>
 
-                            @if (Patient.Cardiology.MeanArterialPressure.HasValue)
-                            {
-                                <span>@Patient.Cardiology.MeanArterialPressure.Value</span>
-                            }
-                            else
-                            {
-                                <span class="text-muted">Enter SBP and DBP.</span>
-                            }
-                        </div>
-                    </div>
-                </div>
+                        <MudItem xs="4">
+                            <MudNumericField T="int?"
+                                             Label="DBP"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             Disabled="@IsSaving"
+                                             Value="Patient.Cardiology.DiastolicBloodPressure"
+                                             ValueChanged="HandleDiastolicBloodPressureChanged" />
+                        </MudItem>
+                    </MudGrid>
 
-                @* Additional common ICU cardiology measurements. *@
-                <div class="card mb-2">
-                    <div class="card-body p-2 p-sm-3">
-                        <h6 class="mb-2 small text-uppercase text-muted">Volume / Echo Clues</h6>
+                    @* MAP is calculated in Cardiology.cs.
+                       It is not directly edited and is not stored as a separate input field here. *@
+                    @if (Patient.Cardiology.MeanArterialPressure.HasValue)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            Calculated MAP: <strong>@Patient.Cardiology.MeanArterialPressure.Value</strong>
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
+                            Enter SBP and DBP to calculate MAP.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudPaper>
 
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <div class="form-floating">
-                                    <InputNumber id="cardiologyCvp"
-                                                 TValue="int?"
-                                                 class="form-control"
-                                                 placeholder=" "
-                                                 @bind-Value="Patient.Cardiology.CentralVenousPressure" />
-                                    <label for="cardiologyCvp">CVP</label>
-                                </div>
-                            </div>
+            @* Additional common ICU cardiology measurements. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">
+                        Volume / Echo Clues
+                    </MudText>
 
-                            <div class="col-6">
-                                <div class="form-floating">
-                                    <InputNumber id="cardiologyIvc"
-                                                 TValue="int?"
-                                                 class="form-control"
-                                                 placeholder=" "
-                                                 @bind-Value="Patient.Cardiology.InferiorVenaCava" />
-                                    <label for="cardiologyIvc">IVC</label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="6">
+                            <MudNumericField T="int?"
+                                             Label="CVP"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             Disabled="@IsSaving"
+                                             Value="Patient.Cardiology.CentralVenousPressure"
+                                             ValueChanged="HandleCentralVenousPressureChanged" />
+                        </MudItem>
 
-                @* Advanced hemodynamic values.
-                   These are nullable because they are only used in selected patients. *@
-                <div class="card mb-2">
-                    <div class="card-body p-2 p-sm-3">
-                        <h6 class="mb-2 small text-uppercase text-muted">Advanced Hemodynamics</h6>
+                        <MudItem xs="6">
+                            <MudNumericField T="int?"
+                                             Label="IVC"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             Disabled="@IsSaving"
+                                             Value="Patient.Cardiology.InferiorVenaCava"
+                                             ValueChanged="HandleInferiorVenaCavaChanged" />
+                        </MudItem>
+                    </MudGrid>
+                </MudStack>
+            </MudPaper>
 
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <div class="form-floating">
-                                    <InputNumber id="cardiologyCi"
-                                                 TValue="decimal?"
-                                                 class="form-control"
-                                                 placeholder=" "
-                                                 @bind-Value="Patient.Cardiology.CardiacIndex" />
-                                    <label for="cardiologyCi">CI</label>
-                                </div>
-                            </div>
+            @* Advanced hemodynamic values.
+               These are nullable because they are used only in selected patients. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">
+                        Advanced Hemodynamics
+                    </MudText>
 
-                            <div class="col-6">
-                                <div class="form-floating">
-                                    <InputNumber id="cardiologyCo"
-                                                 TValue="decimal?"
-                                                 class="form-control"
-                                                 placeholder=" "
-                                                 @bind-Value="Patient.Cardiology.CardiacOutput" />
-                                    <label for="cardiologyCo">CO</label>
-                                </div>
-                            </div>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="6">
+                            <MudNumericField T="decimal?"
+                                             Label="CI"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             Disabled="@IsSaving"
+                                             Value="Patient.Cardiology.CardiacIndex"
+                                             ValueChanged="HandleCardiacIndexChanged" />
+                        </MudItem>
 
-                            <div class="col-6">
-                                <div class="form-floating">
-                                    <InputNumber id="cardiologySvr"
-                                                 TValue="int?"
-                                                 class="form-control"
-                                                 placeholder=" "
-                                                 @bind-Value="Patient.Cardiology.SystemicVascularResistance" />
-                                    <label for="cardiologySvr">SVR</label>
-                                </div>
-                            </div>
+                        <MudItem xs="6">
+                            <MudNumericField T="decimal?"
+                                             Label="CO"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             Disabled="@IsSaving"
+                                             Value="Patient.Cardiology.CardiacOutput"
+                                             ValueChanged="HandleCardiacOutputChanged" />
+                        </MudItem>
 
-                            <div class="col-6">
-                                <div class="form-floating">
-                                    <InputNumber id="cardiologyPcwp"
-                                                 TValue="int?"
-                                                 class="form-control"
-                                                 placeholder=" "
-                                                 @bind-Value="Patient.Cardiology.PulmonaryCapillaryWedgePressure" />
-                                    <label for="cardiologyPcwp">PCWP</label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                        <MudItem xs="6">
+                            <MudNumericField T="int?"
+                                             Label="SVR"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             Disabled="@IsSaving"
+                                             Value="Patient.Cardiology.SystemicVascularResistance"
+                                             ValueChanged="HandleSystemicVascularResistanceChanged" />
+                        </MudItem>
 
-                @* Free text area for extra cardiology details that do not deserve
-                   their own database field yet. *@
-                <div class="card mb-2">
-                    <div class="card-body p-2 p-sm-3">
-                        <div class="form-floating">
-                            <InputTextArea id="cardiologyNotes"
-                                           class="form-control"
-                                           style="height: 7rem"
-                                           placeholder=" "
-                                           @bind-Value="Patient.Cardiology.Notes" />
-                            <label for="cardiologyNotes">Cardiology Notes</label>
-                        </div>
+                        <MudItem xs="6">
+                            <MudNumericField T="int?"
+                                             Label="PCWP"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             FullWidth="true"
+                                             Disabled="@IsSaving"
+                                             Value="Patient.Cardiology.PulmonaryCapillaryWedgePressure"
+                                             ValueChanged="HandlePulmonaryCapillaryWedgePressureChanged" />
+                        </MudItem>
+                    </MudGrid>
+                </MudStack>
+            </MudPaper>
 
-                        <div class="form-text small">
-                            Examples: poor LV function, post PCI, temporary pacemaker, severe MR, echo findings.
-                        </div>
-                    </div>
-                </div>
+            @* Free text area for extra cardiology details that do not deserve
+               their own database field yet. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">
+                        Cardiology Notes
+                    </MudText>
 
-                @* This reusable manager handles adding and editing shared catalog medications.
-               Cardiology stays focused only on cardiology-specific medication rows. *@
-                <div class="mb-2">
+                    <MudTextField T="string"
+                                  Label="Notes"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Lines="5"
+                                  FullWidth="true"
+                                  Disabled="@IsSaving"
+                                  Value="Patient.Cardiology.Notes"
+                                  ValueChanged="HandleNotesChanged" />
+
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Examples: poor LV function, post PCI, temporary pacemaker, severe MR, echo findings.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+
+            @* This reusable manager handles adding and editing shared catalog medications.
+               Cardiology stays focused only on cardiology-specific medication rows.
+               Note: MedicationsManager may still contain Bootstrap until we migrate that component. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">
+                        Medication Catalog
+                    </MudText>
+
                     <MedicationsManager Medications="Medications"
                                         IsDisabled="IsSaving"
                                         OnMedicationsChanged="HandleMedicationsChangedAsync"
                                         OnStatusMessage="HandleStatusMessageAsync" />
-                </div>
+                </MudStack>
+            </MudPaper>
 
-                @* This block edits vasopressor and inotrope medication rows. *@
-                <div class="card mb-2">
-                    <div class="card-body p-2 p-sm-3">
-                        <div class="d-flex flex-column flex-sm-row gap-2 justify-content-between align-items-stretch align-items-sm-center mb-2">
-                            <h6 class="mb-0 small text-uppercase text-muted">Support Medications</h6>
+            @* This block edits vasopressor and inotrope medication rows. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">
+                            Support Medications
+                        </MudText>
 
-                            <button type="button"
-                                    class="btn btn-outline-primary btn-sm"
-                                    @onclick="() => HandleAddCardiologyMedicationAsync(CardiologyMedicationCategory.Support)"
-                                    disabled="@IsSaving">
-                                Add Support
-                            </button>
-                        </div>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Disabled="@IsSaving"
+                                   OnClick="@(() => HandleAddCardiologyMedicationAsync(CardiologyMedicationCategory.Support))">
+                            Add
+                        </MudButton>
+                    </MudStack>
 
-                        @if (GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Support).Any())
+                    @if (GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Support).Any())
+                    {
+                        @foreach (var item in GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Support))
                         {
-                            @foreach (var item in GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Support))
-                            {
-                                <div class="border rounded p-2 mb-2">
-                                    <div class="row g-2">
-                                        <div class="col-12 col-sm-8">
-                                            <div class="form-floating">
-                                                <InputSelect class="form-select"
-                                                             @bind-Value="item.MedicationId">
-                                                    <option value="0">Select Medication</option>
+                            <MudPaper Elevation="0" Outlined="true" Class="pa-2">
+                                <MudGrid Spacing="2" AlignItems="AlignItems.Center">
+                                    <MudItem xs="12" sm="7">
+                                        <MudSelect T="int"
+                                                   Label="Medication"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   FullWidth="true"
+                                                   Disabled="@IsSaving"
+                                                   Value="item.MedicationId"
+                                                   ValueChanged="@(value => HandleMedicationIdChanged(item, value))">
+                                            <MudSelectItem T="int" Value="0">Select Medication</MudSelectItem>
 
-                                                    @foreach (var medication in Medications)
-                                                    {
-                                                        <option value="@medication.Id">@medication.Name</option>
-                                                    }
-                                                </InputSelect>
-                                                <label>Medication</label>
-                                            </div>
-
-                                            @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                            @foreach (var medication in Medications)
                                             {
-                                                <div class="form-text small">
-                                                    Default frequency: @GetMedicationFrequency(item.MedicationId)
-                                                </div>
+                                                <MudSelectItem T="int" Value="@medication.Id">
+                                                    @medication.Name
+                                                </MudSelectItem>
                                             }
-                                        </div>
+                                        </MudSelect>
 
-                                        <div class="col-8 col-sm-3">
-                                            <div class="form-floating">
-                                                <InputNumber TValue="decimal?"
-                                                             class="form-control"
-                                                             placeholder=" "
-                                                             @bind-Value="item.Dose" />
-                                                <label>Dose</label>
-                                            </div>
-                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                Default frequency: @GetMedicationFrequency(item.MedicationId)
+                                            </MudText>
+                                        }
+                                    </MudItem>
 
-                                        <div class="col-4 col-sm-1 d-grid">
-                                            <button type="button"
-                                                    class="btn btn-outline-danger btn-sm"
-                                                    @onclick="() => HandleRemoveCardiologyMedicationAsync(item)"
-                                                    disabled="@IsSaving">
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
+                                    <MudItem xs="8" sm="3">
+                                        <MudNumericField T="decimal?"
+                                                         Label="Dose"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         FullWidth="true"
+                                                         Disabled="@IsSaving"
+                                                         Value="item.Dose"
+                                                         ValueChanged="@(value => HandleMedicationDoseChanged(item, value))" />
+                                    </MudItem>
+
+                                    <MudItem xs="4" sm="2">
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   FullWidth="true"
+                                                   Disabled="@IsSaving"
+                                                   OnClick="@(() => HandleRemoveCardiologyMedicationAsync(item))">
+                                            Remove
+                                        </MudButton>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
                         }
-                        else
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
+                            No support medications added yet.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudPaper>
+
+            @* This block edits other cardiovascular medication rows. *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <MudStack Spacing="2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">
+                            Cardiovascular Medications
+                        </MudText>
+
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Disabled="@IsSaving"
+                                   OnClick="@(() => HandleAddCardiologyMedicationAsync(CardiologyMedicationCategory.Cardiovascular))">
+                            Add
+                        </MudButton>
+                    </MudStack>
+
+                    @if (GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Cardiovascular).Any())
+                    {
+                        @foreach (var item in GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Cardiovascular))
                         {
-                            <div class="alert alert-light border p-2 mb-0 small">
-                                No support medications added yet.
-                            </div>
-                        }
-                    </div>
-                </div>
+                            <MudPaper Elevation="0" Outlined="true" Class="pa-2">
+                                <MudGrid Spacing="2" AlignItems="AlignItems.Center">
+                                    <MudItem xs="12" sm="7">
+                                        <MudSelect T="int"
+                                                   Label="Medication"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   FullWidth="true"
+                                                   Disabled="@IsSaving"
+                                                   Value="item.MedicationId"
+                                                   ValueChanged="@(value => HandleMedicationIdChanged(item, value))">
+                                            <MudSelectItem T="int" Value="0">Select Medication</MudSelectItem>
 
-                @* This block edits other cardiovascular medication rows. *@
-                <div class="card mb-0">
-                    <div class="card-body p-2 p-sm-3">
-                        <div class="d-flex flex-column flex-sm-row gap-2 justify-content-between align-items-stretch align-items-sm-center mb-2">
-                            <h6 class="mb-0 small text-uppercase text-muted">Cardiovascular Medications</h6>
-
-                            <button type="button"
-                                    class="btn btn-outline-primary btn-sm"
-                                    @onclick="() => HandleAddCardiologyMedicationAsync(CardiologyMedicationCategory.Cardiovascular)"
-                                    disabled="@IsSaving">
-                                Add CV Med
-                            </button>
-                        </div>
-
-                        @if (GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Cardiovascular).Any())
-                        {
-                            @foreach (var item in GetCardiologyMedicationsByCategory(CardiologyMedicationCategory.Cardiovascular))
-                            {
-                                <div class="border rounded p-2 mb-2">
-                                    <div class="row g-2">
-                                        <div class="col-12 col-sm-8">
-                                            <div class="form-floating">
-                                                <InputSelect class="form-select"
-                                                             @bind-Value="item.MedicationId">
-                                                    <option value="0">Select Medication</option>
-
-                                                    @foreach (var medication in Medications)
-                                                    {
-                                                        <option value="@medication.Id">@medication.Name</option>
-                                                    }
-                                                </InputSelect>
-                                                <label>Medication</label>
-                                            </div>
-
-                                            @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                            @foreach (var medication in Medications)
                                             {
-                                                <div class="form-text small">
-                                                    Default frequency: @GetMedicationFrequency(item.MedicationId)
-                                                </div>
+                                                <MudSelectItem T="int" Value="@medication.Id">
+                                                    @medication.Name
+                                                </MudSelectItem>
                                             }
-                                        </div>
+                                        </MudSelect>
 
-                                        <div class="col-8 col-sm-3">
-                                            <div class="form-floating">
-                                                <InputNumber TValue="decimal?"
-                                                             class="form-control"
-                                                             placeholder=" "
-                                                             @bind-Value="item.Dose" />
-                                                <label>Dose</label>
-                                            </div>
-                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(GetMedicationFrequency(item.MedicationId)))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                Default frequency: @GetMedicationFrequency(item.MedicationId)
+                                            </MudText>
+                                        }
+                                    </MudItem>
 
-                                        <div class="col-4 col-sm-1 d-grid">
-                                            <button type="button"
-                                                    class="btn btn-outline-danger btn-sm"
-                                                    @onclick="() => HandleRemoveCardiologyMedicationAsync(item)"
-                                                    disabled="@IsSaving">
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
+                                    <MudItem xs="8" sm="3">
+                                        <MudNumericField T="decimal?"
+                                                         Label="Dose"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         FullWidth="true"
+                                                         Disabled="@IsSaving"
+                                                         Value="item.Dose"
+                                                         ValueChanged="@(value => HandleMedicationDoseChanged(item, value))" />
+                                    </MudItem>
+
+                                    <MudItem xs="4" sm="2">
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   FullWidth="true"
+                                                   Disabled="@IsSaving"
+                                                   OnClick="@(() => HandleRemoveCardiologyMedicationAsync(item))">
+                                            Remove
+                                        </MudButton>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
                         }
-                        else
-                        {
-                            <div class="alert alert-light border p-2 mb-0 small">
-                                No cardiovascular medications added yet.
-                            </div>
-                        }
-                    </div>
-                </div>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
+                            No cardiovascular medications added yet.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudPaper>
 
-                @* Save and reload buttons were intentionally removed from this section.
-                   The fixed bottom bar in PatientDetails.razor now controls saving and reloading. *@
-            </EditForm>
-        </div>
-    </div>
+            @* Save and reload buttons are intentionally not here.
+               The fixed PatientDetailsActionBar controls saving and reloading. *@
+        </MudStack>
+    </EditForm>
 }
 else
 {
-    <div class="alert alert-warning p-2">
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
         Cardiology section is not ready for this patient.
-    </div>
+    </MudAlert>
 }
 
 @code {
@@ -387,6 +433,124 @@ else
     // This callback lets the component forward status messages to the parent page.
     [Parameter]
     public EventCallback<string> OnStatusMessage { get; set; }
+
+    // This helper is the key part of dirty tracking for MudBlazor fields.
+    // MudBlazor updates the value correctly, but we also manually notify the EditContext
+    // so PatientDetails.razor can enable the bottom Save button.
+    private void NotifyCardiologyFieldChanged(object model, string propertyName)
+    {
+        CardiologyEditContext.NotifyFieldChanged(new FieldIdentifier(model, propertyName));
+    }
+
+    // Basic hemodynamic fields.
+    // SBP and DBP also refresh the calculated MAP display because MAP is calculated from them.
+    private void HandleHeartRateChanged(int? value)
+    {
+        if (Patient?.Cardiology is null)
+            return;
+
+        Patient.Cardiology.HeartRate = value;
+        NotifyCardiologyFieldChanged(Patient.Cardiology, nameof(Patient.Cardiology.HeartRate));
+    }
+
+    private void HandleSystolicBloodPressureChanged(int? value)
+    {
+        if (Patient?.Cardiology is null)
+            return;
+
+        Patient.Cardiology.SystolicBloodPressure = value;
+        NotifyCardiologyFieldChanged(Patient.Cardiology, nameof(Patient.Cardiology.SystolicBloodPressure));
+    }
+
+    private void HandleDiastolicBloodPressureChanged(int? value)
+    {
+        if (Patient?.Cardiology is null)
+            return;
+
+        Patient.Cardiology.DiastolicBloodPressure = value;
+        NotifyCardiologyFieldChanged(Patient.Cardiology, nameof(Patient.Cardiology.DiastolicBloodPressure));
+    }
+
+    // Volume and echo clue fields.
+    private void HandleCentralVenousPressureChanged(int? value)
+    {
+        if (Patient?.Cardiology is null)
+            return;
+
+        Patient.Cardiology.CentralVenousPressure = value;
+        NotifyCardiologyFieldChanged(Patient.Cardiology, nameof(Patient.Cardiology.CentralVenousPressure));
+    }
+
+    private void HandleInferiorVenaCavaChanged(int? value)
+    {
+        if (Patient?.Cardiology is null)
+            return;
+
+        Patient.Cardiology.InferiorVenaCava = value;
+        NotifyCardiologyFieldChanged(Patient.Cardiology, nameof(Patient.Cardiology.InferiorVenaCava));
+    }
+
+    // Advanced hemodynamic fields.
+    private void HandleCardiacIndexChanged(decimal? value)
+    {
+        if (Patient?.Cardiology is null)
+            return;
+
+        Patient.Cardiology.CardiacIndex = value;
+        NotifyCardiologyFieldChanged(Patient.Cardiology, nameof(Patient.Cardiology.CardiacIndex));
+    }
+
+    private void HandleCardiacOutputChanged(decimal? value)
+    {
+        if (Patient?.Cardiology is null)
+            return;
+
+        Patient.Cardiology.CardiacOutput = value;
+        NotifyCardiologyFieldChanged(Patient.Cardiology, nameof(Patient.Cardiology.CardiacOutput));
+    }
+
+    private void HandleSystemicVascularResistanceChanged(int? value)
+    {
+        if (Patient?.Cardiology is null)
+            return;
+
+        Patient.Cardiology.SystemicVascularResistance = value;
+        NotifyCardiologyFieldChanged(Patient.Cardiology, nameof(Patient.Cardiology.SystemicVascularResistance));
+    }
+
+    private void HandlePulmonaryCapillaryWedgePressureChanged(int? value)
+    {
+        if (Patient?.Cardiology is null)
+            return;
+
+        Patient.Cardiology.PulmonaryCapillaryWedgePressure = value;
+        NotifyCardiologyFieldChanged(Patient.Cardiology, nameof(Patient.Cardiology.PulmonaryCapillaryWedgePressure));
+    }
+
+    // Free-text notes also need explicit notification.
+    private void HandleNotesChanged(string? value)
+    {
+        if (Patient?.Cardiology is null)
+            return;
+
+        Patient.Cardiology.Notes = value;
+        NotifyCardiologyFieldChanged(Patient.Cardiology, nameof(Patient.Cardiology.Notes));
+    }
+
+    // Medication row changes are patient-data changes, so they should mark Cardiology dirty.
+    // The shared medication catalog manager is different: it changes the catalog only,
+    // so it intentionally does not call this helper.
+    private void HandleMedicationIdChanged(CardiologyMedication item, int value)
+    {
+        item.MedicationId = value;
+        NotifyCardiologyFieldChanged(item, nameof(item.MedicationId));
+    }
+
+    private void HandleMedicationDoseChanged(CardiologyMedication item, decimal? value)
+    {
+        item.Dose = value;
+        NotifyCardiologyFieldChanged(item, nameof(item.Dose));
+    }
 
     // This method asks the parent page to add a new cardiology medication row.
     private async Task HandleAddCardiologyMedicationAsync(CardiologyMedicationCategory category)

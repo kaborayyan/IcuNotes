@@ -1,0 +1,222 @@
+﻿@using MudBlazor
+
+@*
+    PatientDetailsActionBar
+
+    This component contains the fixed bottom Save/Reload bar used by
+    PatientDetails.razor.
+
+    Important design decision:
+    - This component is UI-only.
+    - It does not know how to save a patient.
+    - It does not know how to reload a patient.
+    - PatientDetails.razor will still own the real save/reload logic.
+
+    The parent page passes the current status text, section name,
+    dirty state, saving state, and the two callbacks.
+*@
+
+@* Spacer:
+   Because the action bar is fixed to the bottom of the screen, normal page
+   content could be hidden behind it. This spacer reserves enough room at the
+   bottom of the page so the last form fields remain visible and tappable. *@
+<div class="patient-details-actionbar-spacer" aria-hidden="true"></div>
+
+<MudPaper Elevation="8"
+          Square="true"
+          Class="patient-details-actionbar">
+
+    <MudContainer MaxWidth="MaxWidth.False"
+                  Class="px-2 px-sm-3">
+
+        <MudStack Spacing="1">
+
+            @* Status row:
+               This gives the user immediate feedback about the active section.
+               Examples:
+               - Overview has unsaved changes.
+               - Summary saved successfully.
+               - GIT changes reloaded. *@
+            <MudStack Row="true"
+                      AlignItems="AlignItems.Center"
+                      Spacing="1"
+                      Class="patient-details-actionbar-status-row">
+
+                <MudIcon Icon="@StatusIcon"
+                         Color="@StatusColor"
+                         Size="Size.Small" />
+
+                <MudText Typo="Typo.caption"
+                         Color="@StatusColor"
+                         Class="patient-details-actionbar-status-text">
+                    @StatusText
+                </MudText>
+
+                <MudSpacer />
+
+                @if (IsActiveSectionDirty)
+                {
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Color="Color.Warning"
+                             Variant="Variant.Filled">
+                        Unsaved
+                    </MudChip>
+                }
+            </MudStack>
+
+            @* Action row:
+               Reload is secondary because it discards local changes by loading
+               the section again from the database.
+
+               Save is primary because it is the main action the user needs
+               after editing a section. *@
+            <MudGrid Spacing="2">
+                <MudItem xs="5" sm="3" md="2">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Secondary"
+                               Size="Size.Small"
+                               FullWidth="true"
+                               Disabled="@(IsSaving || !OnReload.HasDelegate)"
+                               StartIcon="@Icons.Material.Filled.Refresh"
+                               OnClick="HandleReloadAsync">
+                        Reload
+                    </MudButton>
+                </MudItem>
+
+                <MudItem xs="7" sm="4" md="3">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               FullWidth="true"
+                               Disabled="@(IsSaving || !IsActiveSectionDirty || !OnSave.HasDelegate)"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               OnClick="HandleSaveAsync">
+
+                        @if (IsSaving)
+                        {
+                            <MudProgressCircular Size="Size.Small"
+                                                 Indeterminate="true"
+                                                 Class="mr-2" />
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Save @ActiveSectionName</span>
+                        }
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudStack>
+    </MudContainer>
+</MudPaper>
+
+@code {
+    // Text shown in the bottom bar.
+    // The parent page decides what this text should be.
+    [Parameter]
+    public string StatusText { get; set; } = "Section has loaded.";
+
+    // MudBlazor color for the status text and status icon.
+    [Parameter]
+    public Color StatusColor { get; set; } = Color.Default;
+
+    // Friendly name of the active section.
+    // Example: Overview, Summary, Neurology, Cardiology, GIT.
+    [Parameter]
+    public string ActiveSectionName { get; set; } = "Section";
+
+    // True when the currently opened section has unsaved changes.
+    [Parameter]
+    public bool IsActiveSectionDirty { get; set; }
+
+    // True while the parent page is saving.
+    // This disables buttons and shows a progress indicator inside the Save button.
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    // Called when the user taps Reload.
+    // The parent page provides the real reload method.
+    [Parameter]
+    public EventCallback OnReload { get; set; }
+
+    // Called when the user taps Save.
+    // The parent page provides the real save method.
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+
+    // Choose a simple icon that matches the current state.
+    private string StatusIcon
+    {
+        get
+        {
+            if (IsSaving)
+                return Icons.Material.Filled.Sync;
+
+            if (IsActiveSectionDirty)
+                return Icons.Material.Filled.EditNote;
+
+            return StatusColor switch
+            {
+                Color.Success => Icons.Material.Filled.CheckCircle,
+                Color.Error => Icons.Material.Filled.Error,
+                Color.Warning => Icons.Material.Filled.Warning,
+                Color.Info => Icons.Material.Filled.Info,
+                _ => Icons.Material.Filled.Info
+            };
+        }
+    }
+
+    private async Task HandleReloadAsync()
+    {
+        if (OnReload.HasDelegate)
+            await OnReload.InvokeAsync();
+    }
+
+    private async Task HandleSaveAsync()
+    {
+        if (OnSave.HasDelegate)
+            await OnSave.InvokeAsync();
+    }
+}
+
+<style>
+    /*
+            Fixed bottom Material-style action bar.
+
+            The bar uses MudBlazor palette variables, so it automatically follows
+            the app's light and dark themes.
+        */
+    .patient-details-actionbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1030;
+        padding-top: 0.4rem;
+        padding-bottom: calc(0.4rem + env(safe-area-inset-bottom, 0px));
+        background-color: var(--mud-palette-surface);
+        border-top: 1px solid var(--mud-palette-lines-default);
+    }
+
+    .patient-details-actionbar-status-row {
+        min-width: 0;
+    }
+
+    .patient-details-actionbar-status-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+
+    .patient-details-actionbar-spacer {
+        height: 84px;
+    }
+
+    @@media (max-width: 575.98px) {
+        .patient-details-actionbar-spacer {
+            height: 92px;
+        }
+    }
+</style>
